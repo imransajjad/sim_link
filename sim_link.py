@@ -245,7 +245,6 @@ class MDL(object):
 					if j == len(args):
 						print "not enough args:", N, "needs arg", j
 						print "but len(args) is", len(args)
-						exit()
 				self.ETvalid[j] |= 1
 				j = self.build_table(j,i in args[N].passargs)
 				
@@ -293,7 +292,6 @@ class MDL(object):
 			self.print_table()
 			print "verification failed"
 			traceback.print_exc()
-			exit()
 
 		return True
 
@@ -339,7 +337,6 @@ class MDL(object):
 				print "Error in out from this model, row:"
 				print self.namestring, row
 				print [R[i] for i in row[1]]
-				exit()
 
 		return R
 
@@ -377,7 +374,6 @@ class MDL(object):
 				print "Error in der from this model, row:"
 				print self.namestring, row
 				print [R[i] for i in row[1]]
-				exit()
 
 		return Dx
 
