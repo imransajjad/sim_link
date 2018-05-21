@@ -82,11 +82,12 @@ def rungekutta4(f, *args):
 	function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
 
 	T = args[-2]
-	x = np.array(args[-1])
-	X = np.zeros((len(T), len(x)))
+	x = np.transpose(np.matrix(args[-1]))
+	X = []
+
 	dt = T[1]-T[0]
 	for i,t in enumerate(T):
-		X[i,:] = x
+		X.append(x)
 		k1 = f(t, x, *args[0:-2])
 		k2 = f(t+dt/2, x+k1*dt/2, *args[0:-2])
 		k3 = f(t+dt/2, x+k2*dt/2, *args[0:-2])
@@ -107,7 +108,7 @@ def rungekutta4ad(f, *args, **kwargs):
 
 	T0 = args[-2][0]
 	Tf = args[-2][-1]
-	x = np.array(args[-1])
+	x = np.matrix(args[-1])
 
 	L = 40*np.sqrt(len(x));
 	t = T0

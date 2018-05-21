@@ -181,6 +181,9 @@ I don't want to use isinstance and hasattr so much
 import copy, traceback
 
 
+class out_list(list):
+	"""docstring for out_list"""
+
 class MDL(object):
 	"""docstring for MDL"""
 	def __init__(self,namestring):
@@ -229,7 +232,7 @@ class MDL(object):
 		
 		if write and hasattr(args[N], 'out') and not self.ETvalid[N]&4:
 			# base element is a function, need to add to table
-			# print N, args[N], "found function"
+			print N, args[N], "found function"
 			
 			self.ETvalid[N] |= 4 # optimistically say output will be available
 			for i in range(0,args[N].inargs):
@@ -313,7 +316,7 @@ class MDL(object):
 					for i in row[0].passargs ]  ]
 
 	def out(self,t,x,*inputs):
-		R = list(self.ETflag[0]) # y
+		R = out_list(self.ETflag[0]) # y
 
 		assert len(inputs) == self.inargs
 		for i in range(0,self.inargs):
@@ -324,19 +327,17 @@ class MDL(object):
 		for row in self.ET:
 			try:
 				# all R's should be first output signals, dive inside till true
-				ins = [R[i] for i in row[1]]
-				for i,r in enumerate(ins):
-					if not isinstance(ins[i],int) and not hasattr(ins[i],'out'):
-						while not isinstance(ins[i][0],float):
-							ins[i] = ins[i][0]
-
+				ins = go_deep([R[i] for i in row[1]])
+				
 				R[row[2]] = row[0].out(t,x[x_stride:x_stride+row[0].cstates], *ins )
 				x_stride += row[0].cstates
 			except Exception as e:
 				traceback.print_exc()
 				print "Error in out from this model, row:"
 				print self.namestring, row
-				print [R[i] for i in row[1]]
+				print x[x_stride:x_stride+row[0].cstates]
+				print ins
+				raise e
 
 		return R
 
@@ -358,12 +359,7 @@ class MDL(object):
 				# print t,x, x_stride,x_stride+row[0].cstates, inputs
 
 				# all R's should be first output signals, dive inside till true
-				ins = [R[i] for i in row[1]]
-				for i,r in enumerate(ins):
-					if not isinstance(ins[i],int) and not hasattr(ins[i],'out'):
-						while not isinstance(ins[i][0],float):
-							ins[i] = ins[i][0]
-
+				ins = go_deep([R[i] for i in row[1]])
 
 				dx = row[0].der(t,x[x_stride:x_stride+row[0].cstates], *ins )
 				for xi in range(x_stride,x_stride+row[0].cstates):
@@ -374,6 +370,7 @@ class MDL(object):
 				print "Error in der from this model, row:"
 				print self.namestring, row
 				print [R[i] for i in row[1]]
+				raise e
 
 		return Dx
 
@@ -406,7 +403,13 @@ class MDL(object):
 		print "Number of cstates", self.cstates
 
 
-
+def go_deep(ins):
+	for i,r in enumerate(ins):
+		if not isinstance(ins[i],int) and not hasattr(ins[i],'out'):
+			while isinstance(ins[i],out_list):
+				# print ins[i], ins[i][0]
+				ins[i] = ins[i][0]
+	return ins
 
 		
 def init_MDL(sys,x0_in, namestring):
@@ -418,8 +421,8 @@ def init_MDL(sys,x0_in, namestring):
 			try:
 				i()
 			except Exception as e:
-				print "Invalid System:", i
-				traceback.print_exc()
+				print "Could not initialize System:", i
+				# traceback.print_exc()
 				pass
 
 	# evaluate test and remap initial conditions
