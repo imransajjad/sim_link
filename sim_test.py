@@ -192,4 +192,4 @@ def test4():
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test2()
+	test4()
