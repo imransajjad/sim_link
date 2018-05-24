@@ -156,28 +156,39 @@ def test1():
 
 	x_ref = np.matrix([[1.0]])
 
-	A = np.matrix('0 1; -5 -0.1')
+	A = np.matrix('0 1; -5 -0.01')
 	B = np.matrix('0; 5')
 	C = np.matrix('1 0')
 	D = np.matrix('1')
 
 
-	T = np.arange(0,10.0,0.01)
+	Trange = np.arange(0,10.0,0.001)
 	sys = (sll.ss_LTI(A,B,C,D),[])
 	x0 = ([0.0,0.0],[])
 
 	M,x0 = sl.init_MDL(sys,x0,"this")
 
-	T,X = ode.rungekutta4(M.der, x_ref, T, x0 )
+	x0 = np.transpose(np.matrix(x0))
+	T,X = ode.rungekutta4ad(M.der, x_ref, Trange, x0, e_tol=1e-6, min_dt=1e-6 )
+	Tfixed,Xfixed = ode.rungekutta4(M.der, x_ref, Trange, x0)
 	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
 	
-	print T[-1]
+	print T[-1], len(T)
+	print Tfixed[-1], len(Tfixed)
 	print X[-1]
 	print Y[-1]
-	plt.plot(T,[np.array(x)[:,0] for x in X] )
+	plt.figure(1)
+	plt.subplot(211)
+	plt.plot(T,[np.array(x)[:,0] for x in X])
+	plt.plot(Tfixed,[np.array(x)[:,0] for x in Xfixed])
 	# plt.plot(T,[np.array(sl.go_deep(y[0]))[:,0] for y in Y] )
 
+	plt.subplot(212)
+	plt.plot(T)
+	plt.plot(Tfixed)
+
 	plt.show()
+
 
 
 def test2():
@@ -190,6 +201,7 @@ def test2():
 	# sys = (G,K,x_ref,L,0,1)
 	M,x0 = sl.init_MDL(sys,x0,"this")
 
+	x0 = np.transpose(np.matrix(x0))
 	T,X = ode.rungekutta4(M.der, x_ref, T, x0 )
 	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
 	
@@ -223,7 +235,8 @@ def test4():
 	# M = sl.unpack_MDL(M)
 
 	# M.out(0.0,x0,d_in)
-	T,X = ode.rungekutta4(M.der, d_in,  T, x0 )
+	x0 = np.transpose(np.matrix(x0))
+	T,X = ode.rungekutta4ad(M.der, d_in,  T, x0 )
 	Y = [ M.out(t,x,d_in) for t,x in zip(T,X) ]
 	
 	print T[-1]

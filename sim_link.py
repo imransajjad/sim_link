@@ -232,7 +232,7 @@ class MDL(object):
 		
 		if write and hasattr(args[N], 'out') and not self.ETvalid[N]&4:
 			# base element is a function, need to add to table
-			print N, args[N], "found function"
+			# print N, args[N], "found function"
 			
 			self.ETvalid[N] |= 4 # optimistically say output will be available
 			for i in range(0,args[N].inargs):

@@ -31,8 +31,6 @@ pp. 704-716, 1992.
 
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 
@@ -43,15 +41,16 @@ def integrate(f,*args):
 	the order of input arguments should be as follows #
 	function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
 
-	T = args[-2]
-	x = np.array(args[-1])
-	X = np.zeros((len(T), len(x)))
-	dt = T[1]-T[0]
-	for i,t in enumerate(T):
-		X[i,:] = x
+	x = args[-1]
+	X = [x]
+	T = [args[-2][0]]
+
+	for t in args[-2]:
 
 		k = f(t,x, *args[0:-2] )
 		x = x + k*dt
+		X.append(x)
+		T.append(t)
 	return T,X
 
 def trapz(f,*args):
@@ -61,15 +60,18 @@ def trapz(f,*args):
 	the order of input arguments should be as follows #
 	function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
 
-	T = args[-2]
-	x = np.array(args[-1])
-	X = np.zeros((len(T), len(x)))
-	dt = T[1]-T[0]
-	for i,t in enumerate(T):
-		X[i,:] = x
+	x = args[-1]
+	X = [x]
+	T = [args[-2][0]]
+
+	dt = args[-2][1]-args[-2][0]
+	for t in args[-2]:
 		k1 = f(t, x, *args[0:-2] )
 		k2 = f(t+dt, x+k1*dt, *args[0:-2] )
 		x = x +  0.5*(k1+k2)* dt
+
+		X.append(x)
+		T.append(t)
 	return T,X
 
 
@@ -81,87 +83,91 @@ def rungekutta4(f, *args):
 	the order of input arguments should be as follows #
 	function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
 
-	T = args[-2]
-	x = np.transpose(np.matrix(args[-1]))
-	X = []
+	x = args[-1]
+	X = [x]
+	T = [args[-2][0]]
 
-	dt = T[1]-T[0]
-	for i,t in enumerate(T):
-		X.append(x)
+	dt = args[-2][1]-args[-2][0]
+	for t in args[-2]:
+		
 		k1 = f(t, x, *args[0:-2])
 		k2 = f(t+dt/2, x+k1*dt/2, *args[0:-2])
 		k3 = f(t+dt/2, x+k2*dt/2, *args[0:-2])
 		k4 = f(t+dt, x+k3*dt, *args[0:-2])
 		
 		x = x+ (k1+2*k2+2*k3+k4)/6*dt
+		X.append(x)
+		T.append(t)
 	return T,X
 
 def rungekutta4ad(f, *args, **kwargs):
-
-	# mode can be "fixedstep", "adaptive", "adaptive-fixed"
-
-	mode = "adaptive"
-	for name, value in kwargs.items():
-		if name == "mode":
-			mode = value
-
-
-	T0 = args[-2][0]
+	
+	t = args[-2][0]
+	dt = args[-2][1]-args[-2][0]
 	Tf = args[-2][-1]
-	x = np.matrix(args[-1])
+	x = args[-1]
 
-	L = 40*np.sqrt(len(x));
-	t = T0
-	k1 = f(t, x, *args[0:-2])
+	T = [t]
+	X = [x]
 
-	T = []
-	X = []
-	T.append(t)
-	X.append(x)
+	P = {"min_dt": 1e-5, "e_tol": 1e-6, "gain": 0.04}
+	for key in kwargs:
+		P[key] = kwargs[key]
 
+	O = 7
+	C = [0.0, 1.0/5, 3.0/10, 4.0/5, 8.0/9, 1.0, 1.0]
 
-	min_dt = 0.001
-	dt =  min_dt
+	A = [ [],\
+	[1.0/5],\
+	[3.0/40, 9.0/40],\
+	[44.0/45, -56.0/15, 32.0/9],\
+	[19372.0/6561, -25360.0/2187, 64448.0/6561, -212.0/729],\
+	[9017.0/3168, -355.0/33, -46732.0/5247, 49.0/176, -5103.0/18656],\
+	[35.0/384, 0.0, 500.0/1113, 125.0/192, -2187.0/6784, 11.0/84] ]
 
-	if mode is "adaptive":
-		Ttarget = [Tf]
-		dt = min_dt
-	else:
-		Ttarget = np.arange(T0,Tf,dt)
-		dt = args[-2][1]-args[-2][0]
+	Bup = [35.0/384, 0.0, 500.0/1113, 125.0/192, -2187.0/6784, 11.0/84, 0.0]
+	Bdn = [5179.0/57600, 0.0, 7571.0/16695, 393.0/640, -92097.0/339200, 187.0/2100, 1.0/40]
 
-	for tt in Ttarget:
-		while np.abs(t-tt) > min_dt:
-			k1 = f(t, x, *args[0:-2])
-			k2 = f(t+dt/2, x+k1*dt/2, *args[0:-2])
-			k3 = f(t+dt/2, x+k2*dt/2, *args[0:-2])
-			k4 = f(t+dt, x+k3*dt, *args[0:-2])
-			
-			grad = (k1+2*k2+2*k3+k4)/6
+	k = [0.0]*O
 
-			if mode is not "fixedstep":
-				if np.linalg.norm(grad) > 1.1*L:
-					dt = max(dt*0.99,min_dt)
-				elif np.linalg.norm(grad) < 0.9*L:
-					dt = dt*1.01
+	# O = 4
+	# C = [0.0, 0.5, 0.5, 1.0]
+	# A = [ [], [0.5], [0.0, 0.5], [0.0, 0.0, 1.0]]
+	# Bup = [1.0/6, 1.0/3, 1.0/3, 1.0/6]
+	# Bdn = [1.0/6, 1.0/3, 1.0/3, 1.0/6]
+	# k = [0.0]*O
 
+	while t < Tf:
+		
+		for i,(c,a_row) in enumerate(zip(C,A)):
+			k[i] = f(t+c*dt, x + dt*sum([k[j]*a for j,a in enumerate(a_row)])  , *args[0:-2])
+		
+		gradup = sum([k[i]*b for i,b in enumerate(Bup)])
+		graddn = sum([k[i]*b for i,b in enumerate(Bdn)])
+
+		E =gradup-graddn
+		E = sum([e*e for e in E])
+
+		margin = float(E/P["e_tol"])
+		# print margin
+		
+		if dt < P["min_dt"] or margin < 1.0:
+			# append result if error within bounds
 			t = t+dt
-			x = x+ grad*dt
-			# print Ttarget
-
-			if mode is "adaptive":
-				# append result every iteration
-				T.append(t)
-				X.append(x)
-			elif np.abs(t-tt) <= min_dt:
-				# append result only if target is reached
-				T.append(t)
-				X.append(x)
+			x = x+ gradup*dt
+			T.append(t)
+			X.append(x)
+			dt = (1.0+P["gain"])*dt
+		else:
+			# retry
+			dt = (1.0-P["gain"])*dt
+			# print "retrying with dt = ", dt, margin
 
 
 		
 		
 	return T,X
+
 
 
 def test_f(t,x):
@@ -242,5 +248,8 @@ def test2():
 
 
 if __name__ == '__main__':
+	import numpy as np
+	import matplotlib.pyplot as plt
+
 	print(__doc__)
 	test1()
