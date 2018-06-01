@@ -318,7 +318,11 @@ class MDL(object):
 	def out(self,t,x,*inputs):
 		R = out_list(self.ETflag[0]) # y
 
-		assert len(inputs) == self.inargs
+		if not len(inputs) == self.inargs:
+			print "I ", self, " need ", self.inargs, " but received:"
+			print inputs
+			print 
+			raise AssertionError()
 		for i in range(0,self.inargs):
 			R[self.argmap[i]] = inputs[i]
 
@@ -334,9 +338,10 @@ class MDL(object):
 			except Exception as e:
 				traceback.print_exc()
 				print "Error in out from this model, row:"
-				print self.namestring, row
-				print x[x_stride:x_stride+row[0].cstates]
-				print ins
+				print "I,", self.namestring, ", called"
+				print row
+				print "with states", x[x_stride:x_stride+row[0].cstates]
+				print "with inputs", ins
 				raise e
 
 		return R

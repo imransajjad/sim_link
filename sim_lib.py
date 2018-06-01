@@ -1,12 +1,14 @@
 #!/usr/bin/python
 
+"""A simple python library for some common functions/blocks for sim_link
+most functions are written and tested to support numpy matrices"""
+
 import numpy as np
 
 
-# all signals are taken to be numpy.matrix objects
 
 def int1():
-
+	""" 1d, 1st order integrator"""
 	def der(t,x,u):
 		xdot = u
 		return xdot
@@ -24,12 +26,11 @@ def int1():
 
 
 def add():
-
+	""" add two signals out=a+b """
 	def der(t,x,a,b):
 		return x[0:0]
 	def out(t,x,a,b):
-		y = a+b
-		return y
+		return a+b
 
 	add.der = der
 	add.out = out
@@ -41,13 +42,12 @@ def add():
 
 
 def sub():
-
+	""" subtract two signals out=a+b """
 	def der(t,x,a,b):
 		xdot = x[0:0]
 		return xdot
 	def out(t,x,a,b):
-		y = a-b
-		return y
+		return a-b
 
 	sub.der = der
 	sub.out = out
@@ -58,12 +58,62 @@ def sub():
 	sub.passargs = [0,1]
 
 
+def mul():
+	""" multiply two signals out=a*b """
+	def der(t,x,a,b):
+		xdot = x[0:0]
+		return xdot
+	def out(t,x,a,b):
+		return a*b
+
+	mul.der = der
+	mul.out = out
+	mul.namestring = "mul"
+
+	mul.inargs = 2
+	mul.cstates = 0
+	mul.passargs = [0,1]
+
+
+def div():
+	""" divide two signals out=a/b """
+	def der(t,x,a,b):
+		xdot = x[0:0]
+		return xdot
+	def out(t,x,a,b):
+		return a/b
+
+	div.der = der
+	div.out = out
+	div.namestring = "div"
+
+	div.inargs = 2
+	div.cstates = 0
+	div.passargs = [0,1]
+
+
+def inv():
+	""" inverse two signals out=1/u """
+	def der(t,x,u):
+		xdot = x[0:0]
+		return xdot
+	def out(t,x,u):
+		return 1.0/u
+
+	inv.der = der
+	inv.out = out
+	inv.namestring = "inv"
+
+	inv.inargs = 1
+	inv.cstates = 0
+	inv.passargs = [0]
+
+
 class gain(object):
+	""" gain block out = k*u """
 	def __init__(self,k):
 		self.k = k
 
-		# self.der = der
-		# self.out = out
 		self.namestring = "gain (" + str(self.k) + ")"
 
 		self.inargs = 1
@@ -77,9 +127,26 @@ class gain(object):
 		y = self.k*u
 		return y
 
+class const(object):
+	""" const block out = C """
+	def __init__(self,C):
+		self.C = C
+
+		self.namestring = "const (" + str(self.C) + ")"
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+
+	def der(self,t,x):
+		xdot = x[0:0]
+		return xdot
+	def out(self,t,x):
+		return self.C
+
 
 class integrator_multi(object):
-	"""docstring for integrator"""
+	"""integrator, multi dimensional, nth order"""
 	def __init__(self, ord, u_dim):
 		# super(integrator, self).__init__()
 
@@ -94,6 +161,7 @@ class integrator_multi(object):
 	def der(self,t,x,u):
 		# print x
 		dx = np.roll(x,-1,axis=0)
+		assert len(u) == u_dim
 		dx[self.ord-1::self.ord] = u
 		return dx
 
@@ -104,9 +172,14 @@ class integrator_multi(object):
 
 
 class ss_LTI(object):
+	"""
+	LTI system described by A,B,C,D matrices
+	normal usage 	ss_LTI(A,B,C)
+					ss_LTI(A,B,C,D)
+
+	"""
 	def __init__(self,*args):
-		# normal usage 	ss_LTI(A,B,C)
-		#				ss_LTI(A,B,C,D)
+		
 		self.A = args[0]
 		self.B = args[1]
 		self.C = args[2]
@@ -135,5 +208,58 @@ class ss_LTI(object):
 		y = self.C*x + self.D*u
 		return y
 
+class fun_gen(object):
+	"""y = A*cos(wt+phi)+ofs"""
+	defaultdata = {"A": 1.0, "omega": 2.0*np.pi, "phi": 0.0, "bias": 0.0}
+	def __init__(self,**kwargs):
+		self.data = self.defaultdata.copy()
+		self.data.update(kwargs)
+
+		self.namestring = "fun_gen"
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+
+
+	def der(self,t,x):
+		return np.matrix([])
+	def out(self,t,x):
+		return np.matrix([self.data["A"]*np.cos(self.data["omega"]*t\
+			+self.data["phi"]) + self.data["bias"]])
+
+class joystick_input(object):
+	""" joystick input for linux and windows """
+	def __init__(self,*args):
+		self.namestring = "joystick_input"
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+
+		from inputs import get_gamepad
+		self.get_gamepad = get_gamepad
+
+		self.memory = 0.0
+
+	def der(self,t,x):
+		return np.matrix([])
+
+	def out(self,t,x):
+		events = self.get_gamepad()
+		for event in events:
+			# print(event.ev_type, event.code, event.state)
+			if event.code == 'ABS_RZ':
+				self.memory = -(1.0*event.state-128)/128
+		joy_out = [self.memory]
+
+		joy_out = np.matrix(joy_out)
+		return joy_out
+
+
+
+
+	
+	
 
 

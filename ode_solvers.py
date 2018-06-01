@@ -110,9 +110,9 @@ def rungekutta4ad(f, *args, **kwargs):
 	T = [t]
 	X = [x]
 
-	P = {"min_dt": 1e-5, "e_tol": 1e-6, "gain": 0.04}
-	for key in kwargs:
-		P[key] = kwargs[key]
+	P = {"min_dt": 1e-5, "e_tol": 1e-6, "gain": 0.04, "adaptive": False,\
+	 "realtime": False, "outcall": None, "plotcall": None}
+	P.update(kwargs)
 
 	O = 7
 	C = [0.0, 1.0/5, 3.0/10, 4.0/5, 8.0/9, 1.0, 1.0]
@@ -137,36 +137,75 @@ def rungekutta4ad(f, *args, **kwargs):
 	# Bdn = [1.0/6, 1.0/3, 1.0/3, 1.0/6]
 	# k = [0.0]*O
 
-	while t < Tf:
+	if not P["realtime"]:
+		Ttarget = Tf
+	else:
+		# sys_time = 
+		ti = 1
+		len_T = len(args[-2])
+		Ttarget = args[-2][ti]
+
+	Y = []
+	if P["outcall"]:
+		Y.append( P["outcall"](t,x, *args[0:-2]) )
+
+	print "ode_solver with config"
+	print P
+
+	while t < Ttarget:
 		
 		for i,(c,a_row) in enumerate(zip(C,A)):
 			k[i] = f(t+c*dt, x + dt*sum([k[j]*a for j,a in enumerate(a_row)])  , *args[0:-2])
 		
 		gradup = sum([k[i]*b for i,b in enumerate(Bup)])
-		graddn = sum([k[i]*b for i,b in enumerate(Bdn)])
 
-		E =gradup-graddn
-		E = sum([e*e for e in E])
+		if P["adaptive"]:
+			graddn = sum([k[i]*b for i,b in enumerate(Bdn)])
+			E =gradup-graddn
+			E = sum([e*e for e in E])
 
-		margin = float(E/P["e_tol"])
-		# print margin
-		
-		if dt < P["min_dt"] or margin < 1.0:
-			# append result if error within bounds
+			margin = float(E/P["e_tol"])
+			print margin, t
+			
+			if dt < P["min_dt"] or margin < 1.0:
+				# append result if error within bounds
+				t = t+dt
+				x = x+ gradup*dt
+				T.append(t)
+				X.append(x)
+				dt = (1.0+P["gain"])*dt
+			else:
+				# retry
+				dt = (1.0-P["gain"])*dt
+				# print "retrying with dt = ", dt, margin
+		else:
 			t = t+dt
 			x = x+ gradup*dt
 			T.append(t)
 			X.append(x)
-			dt = (1.0+P["gain"])*dt
-		else:
-			# retry
-			dt = (1.0-P["gain"])*dt
-			# print "retrying with dt = ", dt, margin
+
+		if P["realtime"]:
+			ti +=1
+			if ti < len_T:
+				Ttarget = args[-2][ti]
+
+		if P["outcall"]:
+			Y.append( P["outcall"](t,x, *args[0:-2]) )
+		
+		if P["plotcall"]:
+			if P["realtime"]:
+				P["plotcall"](T,X,Y)
+			elif t >= Tf:
+				P["plotcall"](T,X,Y)
+			if t >= Tf:
+				P["plotcall"].hold()
+			
 
 
-		
-		
-	return T,X
+	if not P["outcall"]:
+		return T,X
+	else:
+		return T,X,Y
 
 
 

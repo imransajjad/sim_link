@@ -2,6 +2,9 @@ import numpy as np
 import ode_solvers as ode
 import sim_link as sl
 import sim_lib as sll
+
+import matplotlib
+matplotlib.use('GTKAgg')
 import matplotlib.pyplot as plt
 
 def B():
@@ -191,25 +194,51 @@ def test1():
 
 
 
-def test2():
-	x_ref = np.matrix([1.0])
-	
 
-	T = np.arange(0,10.0,0.01)
-	sys = (G,K,sll.gain(3.7),[],L,1,0)
+
+
+
+
+def test2():
+	fig = plt.figure()
+	num_plots = 1
+	AXES = []
+	for i in range(0,num_plots):
+		AXES.append(fig.add_subplot(num_plots,1,i+1))
+
+
+
+	def animate(T,X,*args):
+		def hold():
+			plt.show()
+
+		animate.hold = hold
+
+		AXES[0].clear()
+		AXES[0].plot(T,[np.array(x)[:,0] for x in X])
+		plt.pause(0.001)
+
+
+	T = np.arange(0,1.0,0.01)
+	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=1.0),sll.gain(5.0),sll.const(1.0),L,1,0)
 	x0 = ([1.0, 0.6],[],[],[],[0.0,0.0],[],[],[])
+
+
 	# sys = (G,K,x_ref,L,0,1)
 	M,x0 = sl.init_MDL(sys,x0,"this")
 
 	x0 = np.transpose(np.matrix(x0))
-	T,X = ode.rungekutta4(M.der, x_ref, T, x0 )
-	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
+	T,X = ode.rungekutta4ad(M.der, T, x0 , outcall=None, \
+		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=animate)
+
+
+	
 	
 	print T[-1]
 	print X[-1]
-	print Y[-1]
-	plt.plot(T,[np.array(x)[:,0] for x in X] )
-	plt.show()
+	# print Y[-1]
+
+	# animate.hold()
 
 def test4():
 
@@ -236,13 +265,37 @@ def test4():
 
 	# M.out(0.0,x0,d_in)
 	x0 = np.transpose(np.matrix(x0))
-	T,X = ode.rungekutta4(M.der, d_in,  T, x0 )
+	T,X = ode.rungekutta4fixed(M.der, d_in,  T, x0 )
 	Y = [ M.out(t,x,d_in) for t,x in zip(T,X) ]
 	
 	print T[-1]
 	print X[-1]
 	print Y[-1]
 	plt.plot(T,[np.array(x)[:,0] for x in X] )
+	plt.show()
+
+
+def animate_test():
+
+	def animate(i):
+		graph_data = open('example.txt','r').read()
+		lines = graph_data.split('\n')
+		xs = []
+		ys = []
+		for line in lines:
+			if len(line) > 1:
+				x, y = line.split(',')
+				xs.append(x)
+				ys.append(y)
+		ax1.clear()
+		ax1.plot(xs, ys)
+
+	style.use('fivethirtyeight')
+
+	fig = plt.figure()
+	ax1 = fig.add_subplot(1,1,1)
+
+	ani = animation.FuncAnimation(fig, animate, interval=100)
 	plt.show()
 
 
