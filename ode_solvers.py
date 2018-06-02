@@ -30,7 +30,7 @@ Computing, 2nd ed. Cambridge, England: Cambridge University Press,
 pp. 704-716, 1992.
 
 """
-
+import time
 
 
 
@@ -140,7 +140,8 @@ def rungekutta4ad(f, *args, **kwargs):
 	if not P["realtime"]:
 		Ttarget = Tf
 	else:
-		# sys_time = 
+		sys_time = time.time()
+		plot_time = time.time()
 		ti = 1
 		len_T = len(args[-2])
 		Ttarget = args[-2][ti]
@@ -165,7 +166,7 @@ def rungekutta4ad(f, *args, **kwargs):
 			E = sum([e*e for e in E])
 
 			margin = float(E/P["e_tol"])
-			print margin, t
+			# print margin, t
 			
 			if dt < P["min_dt"] or margin < 1.0:
 				# append result if error within bounds
@@ -188,19 +189,24 @@ def rungekutta4ad(f, *args, **kwargs):
 			ti +=1
 			if ti < len_T:
 				Ttarget = args[-2][ti]
+				cur_time = time.time()
+				while (cur_time-sys_time) < (args[-2][ti]-args[-2][ti-1]):
+					if P["plotcall"] and cur_time > plot_time+0.07:
+						P["plotcall"](T,X,Y)
+						plot_time = cur_time
+						cur_time = time.time()
+
+					cur_time = time.time()
+				sys_time = cur_time
+			
+			
 
 		if P["outcall"]:
 			Y.append( P["outcall"](t,x, *args[0:-2]) )
 		
-		if P["plotcall"]:
-			if P["realtime"]:
-				P["plotcall"](T,X,Y)
-			elif t >= Tf:
-				P["plotcall"](T,X,Y)
-			if t >= Tf:
-				P["plotcall"].hold()
-			
 
+	if P["plotcall"] and t >= Tf:
+		P["plotcall"](T,X,Y)
 
 	if not P["outcall"]:
 		return T,X

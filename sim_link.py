@@ -183,6 +183,16 @@ import copy, traceback
 
 class out_list(list):
 	"""docstring for out_list"""
+	def getitemnormally(self,index):
+		return super(out_list,self).__getitem__(index)
+	def __getitem__(self, index):
+		R = self.getitemnormally(index)
+		if isinstance(R,out_list):
+			R = R[0]
+		return R
+		# the altered getitem method is experimental, if in doubt use
+		# the go_deep() function
+	
 
 class MDL(object):
 	"""docstring for MDL"""
@@ -199,7 +209,7 @@ class MDL(object):
 		self.ETvalid = [0]*len(sys)
 
 		# keep building table till complete
-		while not all( self.ETvalid ):
+		while not all( [i&6 for i in self.ETvalid] ):
 			# print "build table pass"
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
@@ -229,10 +239,13 @@ class MDL(object):
 		# 2 is reference to something else
 		# 4 output available
 
+		verbose = False
+		if verbose: print self.ETvalid
+
 		
 		if write and hasattr(args[N], 'out') and not self.ETvalid[N]&4:
 			# base element is a function, need to add to table
-			# print N, args[N], "found function"
+			if verbose: print N, args[N], "found function"
 			
 			self.ETvalid[N] |= 4 # optimistically say output will be available
 			for i in range(0,args[N].inargs):
@@ -261,16 +274,16 @@ class MDL(object):
 			return N
 
 		elif isinstance(args[N], int):
-			# print N, args[N], "found reference to", args[N]
+			if verbose: print N, args[N], "found reference to", args[N]
 			self.ETvalid[N] |= 2
 
 			return self.build_table(args[N],write)
 		elif isinstance(args[N], list):
 			self.ETvalid[N] |= 4
-			# print N, args[N], "found constant", args[N]
+			if verbose:  print N, args[N], "found constant", args[N]
 			return N
 		else:
-			# print N, args[N], "found else", args[N]
+			if verbose:  print N, args[N], "found else", args[N]
 			return N
 
 
@@ -331,7 +344,8 @@ class MDL(object):
 		for row in self.ET:
 			try:
 				# all R's should be first output signals, dive inside till true
-				ins = go_deep([R[i] for i in row[1]])
+				# ins = go_deep([R[i] for i in row[1]])
+				ins = [R[i] for i in row[1]]
 				
 				R[row[2]] = row[0].out(t,x[x_stride:x_stride+row[0].cstates], *ins )
 				x_stride += row[0].cstates
@@ -364,7 +378,8 @@ class MDL(object):
 				# print t,x, x_stride,x_stride+row[0].cstates, inputs
 
 				# all R's should be first output signals, dive inside till true
-				ins = go_deep([R[i] for i in row[1]])
+				# ins = go_deep([R[i] for i in row[1]])
+				ins = [R[i] for i in row[1]]
 
 				dx = row[0].der(t,x[x_stride:x_stride+row[0].cstates], *ins )
 				for xi in range(x_stride,x_stride+row[0].cstates):

@@ -4,7 +4,7 @@ import sim_link as sl
 import sim_lib as sll
 
 import matplotlib
-matplotlib.use('GTKAgg')
+# matplotlib.use('GTKAgg')
 import matplotlib.pyplot as plt
 
 def B():
@@ -200,28 +200,34 @@ def test1():
 
 
 def test2():
-	fig = plt.figure()
-	num_plots = 1
-	AXES = []
-	for i in range(0,num_plots):
-		AXES.append(fig.add_subplot(num_plots,1,i+1))
+	fig,ax = plt.subplots()
+	lines = ax.plot( *([[]]*8) )
 
-
+	ax.grid()
 
 	def animate(T,X,*args):
 		def hold():
 			plt.show()
 
 		animate.hold = hold
+		ax.figure.canvas.draw()
 
-		AXES[0].clear()
-		AXES[0].plot(T,[np.array(x)[:,0] for x in X])
-		plt.pause(0.001)
+		this_x = np.array(X)
+		ax.set_xlim(0, max(T))
+		ax.set_ylim(np.amin(this_x),np.amax(this_x))
+
+		for i,l in enumerate(lines):
+			l.set_data(T, this_x[:,i] )
+
+		plt.pause(0.00001)
 
 
-	T = np.arange(0,1.0,0.01)
+	T = np.arange(0,40.0,0.01)
 	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=1.0),sll.gain(5.0),sll.const(1.0),L,1,0)
 	x0 = ([1.0, 0.6],[],[],[],[0.0,0.0],[],[],[])
+
+	# sys = (sll.int1,sll.fun_gen())
+	# x0 = ([0.0],[0.0],[])
 
 
 	# sys = (G,K,x_ref,L,0,1)
@@ -229,7 +235,9 @@ def test2():
 
 	x0 = np.transpose(np.matrix(x0))
 	T,X = ode.rungekutta4ad(M.der, T, x0 , outcall=None, \
-		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=animate)
+		adaptive=True, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=animate)
+
+	plt.show()
 
 
 	
@@ -261,11 +269,11 @@ def test4():
 
 	M,x0 = sl.init_MDL(sys_12 ,x0_12, "Model KGL1+KGL21-G")
 
-	# M = sl.unpack_MDL(M)
+	M = sl.unpack_MDL(M)
 
 	# M.out(0.0,x0,d_in)
 	x0 = np.transpose(np.matrix(x0))
-	T,X = ode.rungekutta4fixed(M.der, d_in,  T, x0 )
+	T,X = ode.rungekutta4(M.der, d_in,  T, x0 )
 	Y = [ M.out(t,x,d_in) for t,x in zip(T,X) ]
 	
 	print T[-1]
