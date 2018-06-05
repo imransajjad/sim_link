@@ -130,7 +130,7 @@ Basic ideas:
 5. The MDL function is also similar to G, L etc
     It has MDL(), MDL.out(t,x), MDL.der(t,x) methods, which are used in the same
     way
-    In addition, it has the static variables MDL.ET and MDL.ETflag that contain
+    In addition, it has the static variables MDL.ET and MDL.ETflag[0] that contain
     references to the original functions, execution order and valid flags, that
     together form the execution table.
 
@@ -185,11 +185,19 @@ class out_list(list):
 	"""docstring for out_list"""
 	def getitemnormally(self,index):
 		return super(out_list,self).__getitem__(index)
-	def __getitem__(self, index):
+	def getfirstitem(self, index):
 		R = self.getitemnormally(index)
 		if isinstance(R,out_list):
-			R = R[0]
+			R = R.getfirstitem(0)
 		return R
+
+	def __getitem__(self, index):
+		return self.getfirstitem(index)
+	def probe(self, *indices):
+		if len(indices) > 1:
+			return self.getitemnormally(indices[0]).probe(*indices[1:])
+		else:
+			return self.getfirstitem(indices[0])
 		# the altered getitem method is experimental, if in doubt use
 		# the go_deep() function
 	
@@ -204,7 +212,8 @@ class MDL(object):
 	
 	def init_table(self,sys):
 
-		self.ETflag = [sys,False]
+		self.ETregister = out_list(sys)
+		self.ETflag = [False]
 		self.ET = []
 		self.ETvalid = [0]*len(sys)
 
@@ -214,8 +223,8 @@ class MDL(object):
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
 		
-		self.ETflag[1] = self.verify_table()
-		self.argmap = [i for i,r in enumerate(self.ETflag[0]) \
+		self.ETflag[0] = self.verify_table()
+		self.argmap = [i for i,r in enumerate(self.ETregister) \
 						if isinstance(r,list)]
 		
 		self.inargs = len(self.argmap)
@@ -223,12 +232,12 @@ class MDL(object):
 		self.passargs = [i for i, p in enumerate([self.isPassArg(i,False) \
 						for i in self.argmap]) if p]
 		
-		return self.ETflag[1]
+		return self.ETflag[0]
 
 
 	def build_table(self,N,write):
 		# generate exec table recursively
-		args = self.ETflag[0]
+		args = self.ETregister
 
 		# print "\n", self.ETvalid
 		exec_is = []
@@ -329,7 +338,7 @@ class MDL(object):
 					for i in row[0].passargs ]  ]
 
 	def out(self,t,x,*inputs):
-		R = out_list(self.ETflag[0]) # y
+		R = out_list(self.ETregister) # y
 
 		if not len(inputs) == self.inargs:
 			print "I ", self, " need ", self.inargs, " but received:"
@@ -345,7 +354,7 @@ class MDL(object):
 			try:
 				# all R's should be first output signals, dive inside till true
 				# ins = go_deep([R[i] for i in row[1]])
-				ins = [R[i] for i in row[1]]
+				ins = [R.getfirstitem(i) for i in row[1]]
 				
 				R[row[2]] = row[0].out(t,x[x_stride:x_stride+row[0].cstates], *ins )
 				x_stride += row[0].cstates
@@ -379,12 +388,13 @@ class MDL(object):
 
 				# all R's should be first output signals, dive inside till true
 				# ins = go_deep([R[i] for i in row[1]])
-				ins = [R[i] for i in row[1]]
+				if row[0].cstates:
+					ins = [R.getfirstitem(i) for i in row[1]]
 
-				dx = row[0].der(t,x[x_stride:x_stride+row[0].cstates], *ins )
-				for xi in range(x_stride,x_stride+row[0].cstates):
-					Dx[xi] = dx[xi-x_stride]
-				x_stride += row[0].cstates
+					dx = row[0].der(t,x[x_stride:x_stride+row[0].cstates], *ins )
+					for xi in range(x_stride,x_stride+row[0].cstates):
+						Dx[xi] = dx[xi-x_stride]
+					x_stride += row[0].cstates
 			except Exception as e:
 				traceback.print_exc()
 				print "Error in der from this model, row:"
@@ -393,6 +403,16 @@ class MDL(object):
 				raise e
 
 		return Dx
+
+	def print_probes(self):
+		def pp(self,ind):
+			for i,r in enumerate(self.ETregister):
+				print "%s%d %s" % (ind, i, ( r.namestring if hasattr(r,'out')  else "" ))
+				if isinstance(r,MDL):
+					pp(r,"   " + ind)
+		print "Valid probe values:"
+		pp(self,"")
+
 
 
 	def print_table(self):
@@ -403,24 +423,25 @@ class MDL(object):
 				for i in row[0].passargs:
 					i_string[i] += "p"
 			print "	", row[0].namestring, ", ins:" , i_string, ", outs:", row[2]
-		print "Table valid: ", self.ETflag[1]
+		print "Table valid: ", self.ETflag[0]
 		self.print_register()
-		if self.ETflag[1]:
+		if self.ETflag[0]:
 			self.print_addinfo()
+			self.print_probes()
 		
 		print "\nEnd System Execution Table\n--------------\n"
 
 	def print_register(self):
 		print "\nSystem signal register:"
 		print "	", [R.namestring if hasattr(R,'namestring') \
-					else R for R in self.ETflag[0]]
+					else R for R in self.ETregister]
 
 	def print_addinfo(self):
 		print "\nSystem I/O:"
 		i_string = [str(a)+"p" if i in self.passargs else str(a) \
 						for i,a in enumerate(self.argmap)]
 		print "Inputs", i_string
-		print "Number of cstates", self.cstates
+		print "Number of cstates", self.cstates, "\n"
 
 
 def go_deep(ins):
@@ -449,7 +470,7 @@ def init_MDL(sys,x0_in, namestring):
 	M = MDL(namestring) # init and
 	M.init_table(sys) # build table
 
-	assert M.ETflag[1]
+	assert M.ETflag[0]
 
 	x0 = []
 	for row in M.ET:
@@ -478,11 +499,10 @@ def unpack_MDL(M):
 
 	def reg_extend(M):
 		Nreg = []
-		Nreg += M.ETflag[0]
+		Nreg += M.ETregister
 		Nrows = list(M.ET)
 		OFSes = []
 		i = 0
-		# for i,m in enumerate(M.ETflag[0]):
 		while i < len(Nreg):
 			if isinstance(Nreg[i],MDL):
 
@@ -499,7 +519,7 @@ def unpack_MDL(M):
 				# print m
 				
 				sub_argmap = Nreg[i].argmap
-				sub_reg = Nreg[i].ETflag[0]
+				sub_reg = Nreg[i].ETregister
 				# done extracting some data from subsystem
 
 				ofs = len(Nreg)-1
@@ -566,12 +586,13 @@ def unpack_MDL(M):
 	Mnew.namestring += "_unpacked"
 
 	Mnew.ET = Nrows
-	Mnew.ETflag = [Nreg,Mnew.verify_table()]
+	Mnew.ETregister = Nreg
+	Mnew.ETflag[0] = Mnew.verify_table()
 	Mnew.ETvalid = [0]*len(Nreg)
 
 	Mnew.print_table()
 
-	assert Mnew.ETflag[1]
+	assert Mnew.ETflag[0]
 
 	# print min_tuples
 	# print Mnew.argmap

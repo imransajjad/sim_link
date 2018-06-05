@@ -175,6 +175,8 @@ def rungekutta4ad(f, *args, **kwargs):
 				T.append(t)
 				X.append(x)
 				dt = (1.0+P["gain"])*dt
+				if P["outcall"]:
+					Y.append( P["outcall"](t,x, *args[0:-2]) )
 			else:
 				# retry
 				dt = (1.0-P["gain"])*dt
@@ -184,6 +186,8 @@ def rungekutta4ad(f, *args, **kwargs):
 			x = x+ gradup*dt
 			T.append(t)
 			X.append(x)
+			if P["outcall"]:
+				Y.append( P["outcall"](t,x, *args[0:-2]) )
 
 		if P["realtime"]:
 			ti +=1
@@ -201,8 +205,7 @@ def rungekutta4ad(f, *args, **kwargs):
 			
 			
 
-		if P["outcall"]:
-			Y.append( P["outcall"](t,x, *args[0:-2]) )
+			
 		
 
 	if P["plotcall"] and t >= Tf:

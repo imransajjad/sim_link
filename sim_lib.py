@@ -27,12 +27,12 @@ def int1():
 
 def add():
 	""" add two signals out=a+b """
-	def der(t,x,a,b):
-		return x[0:0]
+	# def der(t,x,a,b):
+	# 	return x[0:0]
 	def out(t,x,a,b):
 		return a+b
 
-	add.der = der
+	# add.der = der
 	add.out = out
 	add.namestring = "add"
 
@@ -43,13 +43,13 @@ def add():
 
 def sub():
 	""" subtract two signals out=a+b """
-	def der(t,x,a,b):
-		xdot = x[0:0]
-		return xdot
+	# def der(t,x,a,b):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(t,x,a,b):
 		return a-b
 
-	sub.der = der
+	# sub.der = der
 	sub.out = out
 	sub.namestring = "sub"
 
@@ -60,13 +60,13 @@ def sub():
 
 def mul():
 	""" multiply two signals out=a*b """
-	def der(t,x,a,b):
-		xdot = x[0:0]
-		return xdot
+	# def der(t,x,a,b):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(t,x,a,b):
 		return a*b
 
-	mul.der = der
+	# mul.der = der
 	mul.out = out
 	mul.namestring = "mul"
 
@@ -77,13 +77,13 @@ def mul():
 
 def div():
 	""" divide two signals out=a/b """
-	def der(t,x,a,b):
-		xdot = x[0:0]
-		return xdot
+	# def der(t,x,a,b):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(t,x,a,b):
 		return a/b
 
-	div.der = der
+	# div.der = der
 	div.out = out
 	div.namestring = "div"
 
@@ -94,19 +94,65 @@ def div():
 
 def inv():
 	""" inverse two signals out=1/u """
-	def der(t,x,u):
-		xdot = x[0:0]
-		return xdot
+	# def der(t,x,u):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(t,x,u):
 		return 1.0/u
 
-	inv.der = der
+	# inv.der = der
 	inv.out = out
 	inv.namestring = "inv"
 
 	inv.inargs = 1
 	inv.cstates = 0
 	inv.passargs = [0]
+
+def sat():
+	""" inverse two signals out=1/u """
+	# def der(t,x,u):
+	# 	xdot = x[0:0]
+	# 	return xdot
+	def out(t,x,u):
+		return u* (-1 < u)*(u < 1) + 1*(u >= 1) - 1*(u <= -1)
+
+	# inv.der = der
+	sat.out = out
+	sat.namestring = "sat"
+
+	sat.inargs = 1
+	sat.cstates = 0
+	sat.passargs = [0]
+
+def sgn():
+	""" inverse two signals out=1/u """
+	# def der(t,x,u):
+	# 	xdot = x[0:0]
+	# 	return xdot
+	def out(t,x,u):
+		return  1*(u > 0) - 1*(u < 0)
+
+	# inv.der = der
+	sgn.out = out
+	sgn.namestring = "sgn"
+
+	sgn.inargs = 1
+	sgn.cstates = 0
+	sgn.passargs = [0]
+
+def time():
+	""" add two signals out=a+b """
+	# def der(t,x,a,b):
+	# 	return x[0:0]
+	def out(t,x):
+		return np.matrix([t])
+
+	time.out = out
+	time.namestring = "time"
+
+	time.inargs = 0
+	time.cstates = 0
+	time.passargs = []
 
 
 class gain(object):
@@ -120,9 +166,9 @@ class gain(object):
 		self.cstates = 0
 		self.passargs = [0]
 
-	def der(self,t,x,u):
-		xdot = x[0:0]
-		return xdot
+	# def der(self,t,x,u):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(self,t,x,u):
 		y = self.k*u
 		return y
@@ -138,9 +184,9 @@ class const(object):
 		self.cstates = 0
 		self.passargs = []
 
-	def der(self,t,x):
-		xdot = x[0:0]
-		return xdot
+	# def der(self,t,x):
+	# 	xdot = x[0:0]
+	# 	return xdot
 	def out(self,t,x):
 		return self.C
 
@@ -222,8 +268,8 @@ class fun_gen(object):
 		self.passargs = []
 
 
-	def der(self,t,x):
-		return np.matrix([])
+	# def der(self,t,x):
+	# 	return np.matrix([])
 	def out(self,t,x):
 		return np.matrix([self.data["A"]*np.cos(self.data["omega"]*t\
 			+self.data["phi"]) + self.data["bias"]])
@@ -242,8 +288,8 @@ class joystick_input(object):
 
 		self.memory = 0.0
 
-	def der(self,t,x):
-		return np.matrix([])
+	# def der(self,t,x):
+	# 	return np.matrix([])
 
 	def out(self,t,x):
 		events = self.get_gamepad()
@@ -255,6 +301,18 @@ class joystick_input(object):
 
 		joy_out = np.matrix(joy_out)
 		return joy_out
+
+
+# def plot(T,X,*args,**kwargs):
+# 	data = {"states": [], "probes": []}
+# 	plot.statics = {"stateplots": [], "outplots": [], "plots_exist", False}
+# 	data.update(kwargs)
+
+# 	if plot
+
+# 	for s in states:
+
+
 
 
 
