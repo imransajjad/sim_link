@@ -56,7 +56,7 @@ to make the ones on the left work for all cases
 elements in this tuple can only be:
 
 function objects 	<=>	system blocks
-empty lists []		<=>	constant signals/ inputs
+empty lists []		<=>	inputs
 ints e.g 0, 1		<=> references to other signals
 
 The order of elements here is important!!!
@@ -86,19 +86,20 @@ def test2():
 	x_ref = [1.0]
 	
 	T = np.arange(0,10.0,0.01)
-	sys = (G,K,x_ref,L,1,0)
+	sys = (G,K,[],L,1,0)
 	x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
-	# sys = (G,K,x_ref,L,0,1) # try this, it'll cause an error
+	# sys = (G,K,[],L,0,1) # try this, it'll cause an error
 
-	M,x0 = sl.init_MDL(sys,x0,"this")
+	M = sl.MDL(sys,x0,"this")
+	x0 = np.transpose(np.matrix(M.x0))
 
-	T,X = ode.rungekutta4(M.der, T, x0 )
-	Y = [ M.out(t,x) for t,x in zip(T,X) ]
+	T,X = ode.rungekutta4(M.der, x_ref,T, x0 )
+	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
 	
 	print T[-1]
 	print X[-1]
 	print Y[-1]
-	plt.plot(T,X)
+	plt.plot(T,[np.array(x)[:,0] for x in X])
 	plt.show()
 
 ---
@@ -200,22 +201,51 @@ class out_list(list):
 			return self.getfirstitem(indices[0])
 		# the altered getitem method is experimental, if in doubt use
 		# the go_deep() function
+	def probe_s(self, *probe_indices):
+		return [self.probe(*i) for i in probe_indices]
 	
 
 class MDL(object):
 	"""docstring for MDL"""
-	def __init__(self,namestring):
+	def __init__(self,sys,x0_in,namestring):
 		# super(MDL, self).__init__()
 		self.namestring = namestring
-		pass
 
+
+		print "Initializing System:", namestring
 	
-	def init_table(self,sys):
+		for i in sys:
+			if callable(i):
+				try:
+					i()
+				except Exception as e:
+					print "Could not initialize System:", i
+					# traceback.print_exc()
+					pass
 
 		self.ETregister = out_list(sys)
+
+		# evaluate test and remap initial conditions
+		self.init_table() # build table
+
+		assert self.ETflag[0]
+
+		self.x0 = []
+		for row in self.ET:
+			self.x0 += x0_in[row[2]]
+
+		
+		self.print_table()
+		# print "x0: ", self.x0
+		# print "Done Initializing System:", namestring, "\n\n\n"
+
+	
+	def init_table(self):
+
+		
 		self.ETflag = [False]
 		self.ET = []
-		self.ETvalid = [0]*len(sys)
+		self.ETvalid = [0]*len(self.ETregister)
 
 		# keep building table till complete
 		while not all( [i&6 for i in self.ETvalid] ):
@@ -416,7 +446,7 @@ class MDL(object):
 
 
 	def print_table(self):
-		print "\n--------------\nSystem Execution Table (", self.namestring, ")"
+		print "--------------\nSystem Execution Table ("+self.namestring+ ")"
 		for row in self.ET:
 			i_string = [ str(i_s) for i,i_s in enumerate(row[1])]
 			if not isinstance(row[0],list):
@@ -429,7 +459,7 @@ class MDL(object):
 			self.print_addinfo()
 			self.print_probes()
 		
-		print "\nEnd System Execution Table\n--------------\n"
+		print "\nEnd System Execution Table ("+ self.namestring +")\n--------------\n"
 
 	def print_register(self):
 		print "\nSystem signal register:"
@@ -453,33 +483,33 @@ def go_deep(ins):
 	return ins
 
 		
-def init_MDL(sys,x0_in, namestring):
+# def init_MDL(sys,x0_in, namestring):
 
-	print "Initializing System:", namestring, "\n"
+# 	print "Initializing System:", namestring, "\n"
 	
-	for i in sys:
-		if callable(i):
-			try:
-				i()
-			except Exception as e:
-				print "Could not initialize System:", i
-				# traceback.print_exc()
-				pass
+# 	for i in sys:
+# 		if callable(i):
+# 			try:
+# 				i()
+# 			except Exception as e:
+# 				print "Could not initialize System:", i
+# 				# traceback.print_exc()
+# 				pass
 
-	# evaluate test and remap initial conditions
-	M = MDL(namestring) # init and
-	M.init_table(sys) # build table
+# 	# evaluate test and remap initial conditions
+# 	M = MDL(namestring) # init and
+# 	M.init_table(sys) # build table
 
-	assert M.ETflag[0]
+# 	assert M.ETflag[0]
 
-	x0 = []
-	for row in M.ET:
-		x0 += x0_in[row[2]]
+# 	x0 = []
+# 	for row in M.ET:
+# 		x0 += x0_in[row[2]]
 
 	
-	M.print_table()
-	print "x0: ", x0
-	print "Done Initializing System:", namestring, "\n\n\n"
+# 	M.print_table()
+# 	print "x0: ", x0
+# 	print "Done Initializing System:", namestring, "\n\n\n"
 
 	return M,x0
 
@@ -557,7 +587,7 @@ def unpack_MDL(M):
 
 		return Nreg, Nrows, OFSes
 
-	print "Unpacking System:", M.namestring, "\n"
+	print "Unpacking System:", M.namestring
 
 	Nreg, Nrows, ofses = reg_extend(M)
 
@@ -597,6 +627,33 @@ def unpack_MDL(M):
 	# print min_tuples
 	# print Mnew.argmap
 
-	print "Done Unpacked System:", Mnew.namestring, "\n\n\n"
+	# print "Done Unpacked System:", Mnew.namestring, "\n"
 
 	return Mnew
+
+def verify(A):
+	"""necessary test if A is a valid function block"""
+	maybe_valid = True
+
+	attr_names = ['out','namestring','inargs','passargs','cstates']
+	nec_attr = [hasattr(A,i) for i in attr_names]
+	der_attr = hasattr(A,'der')
+
+	if not all(nec_attr):
+		maybe_valid = False
+		print A, "does not have:"
+		# print nec_attr
+		for name,a in zip(attr_names,nec_attr):
+			if not a: print name
+
+	if nec_attr[0] and der_attr:
+		if not A.der.func_code.co_argcount == A.out.func_code.co_argcount:
+			maybe_valid = False
+			print A, "out and der don't have equal number of arguments"
+	if nec_attr[2] and nec_attr[3]:
+		if not len(A.passargs) <= A.inargs:
+			maybe_valid = False
+			print A, "passargs/inargs not right"
+	return maybe_valid
+
+

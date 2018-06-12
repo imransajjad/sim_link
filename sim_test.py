@@ -193,46 +193,50 @@ def test1():
 	plt.show()
 
 
+class plot_window(object):
+	"""docstring for plot_window"""
+	def __init__(self, cstates,*probe_list):
+		super(plot_window, self).__init__()
+		self.probe_list = probe_list
 
+		self.fig, (self.ax1, self.ax2) = plt.subplots(2,1)
+		self.states = self.ax1.plot(*( [[]]*(2*cstates) ))
+		self.outs = self.ax2.plot  (*( [[]]*(2*len(probe_list)) ))
+		self.ax2.set_ylim(-4,4)
+
+
+		self.ax1.grid()
+
+	def animate(self,T,X,*args):
+		self.ax1.figure.canvas.draw()
+		self.ax2.figure.canvas.draw()
+
+		this_x = np.array(X)
+		for i,l in enumerate(self.states):
+			l.set_data(T, this_x[:,i] )
+		self.ax1.set_xlim(0, max(T))
+		self.ax1.set_ylim(np.amin(this_x),np.amax(this_x))
+
+
+		if args and self.probe_list:
+			this_y = np.array([ y.probe_s(*self.probe_list) for y in args[0]])
+			# print "here"
+			# print this_x
+			# print this_y	
+			self.ax2.set_xlim(0, max(T))
+			# self.ax2.set_ylim(np.amin(this_y),np.amax(this_y))
+			for i,l in enumerate(self.outs):
+				l.set_data(T,  this_y[:,i] )
+
+		plt.pause(0.00001)
+
+		
 
 
 
 
 
 def test2():
-	fig, (ax1, ax2) = plt.subplots(2,1)
-	states = ax1.plot( *([[]]*2) )
-	outs = ax2.plot( *([[]]*2) )
-
-	ax1.grid()
-
-	def animate(T,X,*args):
-		def hold():
-			plt.show()
-
-		
-
-		animate.hold = hold
-		ax1.figure.canvas.draw()
-		ax2.figure.canvas.draw()
-
-		this_x = np.array(X)
-		out_probes = [0]
-		if args:
-			this_y = np.array([ [y.probe(p)[0,0] for p in out_probes] for y in args[0]])
-			
-		
-		ax1.set_xlim(0, max(T))
-		ax2.set_xlim(0, max(T))
-		ax1.set_ylim(np.amin(this_x),np.amax(this_x))
-		ax2.set_ylim(np.amin(this_y),np.amax(this_y))
-
-		for i,l in enumerate(states):
-			l.set_data(T, this_x[:,i] )
-		for i,l in enumerate(outs):
-			l.set_data(T,  this_y[:,i] )
-
-		plt.pause(0.00001)
 
 
 	T = np.arange(0,4.0,0.01)
@@ -244,11 +248,14 @@ def test2():
 
 
 	# sys = (G,K,x_ref,L,0,1)
-	M,x0 = sl.init_MDL(sys,x0,"this")
+	M = sl.MDL(sys,x0,"this")
 
-	x0 = np.transpose(np.matrix(x0))
+
+	PW = plot_window(1,[0],[1],[2],[3])
+
+	x0 = np.transpose(np.matrix(M.x0))
 	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.out, \
-		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=animate)
+		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=PW.animate)
 
 	plt.show()
 
@@ -270,33 +277,85 @@ def test4():
 	sys_1 = (G,K,sll.gain(3.7),[],L,1,0)
 	x0_1 = ([1.0, 0.6],[],[],[],[0.0,0.0])
 
-	M1,x0_1 = sl.init_MDL(sys_1, x0_1, "Model KGL1")
+	M1 = sl.MDL(sys_1, x0_1, "Model KGL1")
 
 	sys_2 = (G,K,M1,[],L,1,0)
-	x0_2 = ([1.5, 0.6],[],x0_1,[],[0.0,0.0],[],[])
+	x0_2 = ([1.5, 0.6],[],M1.x0,[],[0.0,0.0],[],[])
 
-	M2,x0_2 = sl.init_MDL(sys_2, x0_2, "Model KGL21")
+	M2 = sl.MDL(sys_2, x0_2, "Model KGL21")
 
 	sys_12 = (M1,M2,D,ES,[])
-	x0_12 =(x0_1,x0_2,[0.0,0.0],[],[],[])
+	x0_12 =(M1.x0,M2.x0,[0.0,0.0],[],[],[])
 
-	M,x0 = sl.init_MDL(sys_12 ,x0_12, "Model KGL1+KGL21-G")
+	M = sl.MDL(sys_12 ,x0_12, "Model KGL1+KGL21-G")
+	assert sl.verify(M)
 
-	# M = sl.unpack_MDL(M)
+	M = sl.unpack_MDL(M)
+	assert sl.verify(M)
 
 	# M.out(0.0,x0,d_in)
-	x0 = np.transpose(np.matrix(x0))
+	x0 = np.transpose(np.matrix(M.x0))
 	T,X = ode.rungekutta4ad(M.der, d_in,  T, x0)
 	Y = [ M.out(t,x,d_in) for t,x in zip(T,X) ]
 	
 	print T[-1]
 	print X[-1]
 	print Y[-1]
-	print Y[-1].probe(1,2,3)
+	print Y[-1].probe_s([0],[2],[3])
 	plt.plot(T,[np.array(x)[:,0] for x in X] )
 	plt.show()
 
 
+def invalid_function():
+	def der(t,x):
+		return 0
+	invalid_function.der = der
+
+	invalid_function.cstates = 0
+
+def test0():
+	sys = (sll.gain(3.4),[])
+	x0 = ([],)
+
+
+	G1 = sl.MDL(sys,x0,'sys_gain1')
+
+
+	M = sl.MDL( (G1, sll.const(1.5)),([],[]),'sys1')
+	M = sl.unpack_MDL(M)
+	sys[0].k = 1.0
+
+
+	# x0 = np.transpose(np.matrix(M.x0))
+	t = np.arange(0,1,0.01)
+
+	T,X = ode.rungekutta4ad(M.der,t,x0)
+	Y = [M.out(t,x) for t,x in zip(T,X)]
+	print T[-1]
+	print X[-1]
+	print Y[-1]
+
+
+
+def test8():
+	x_ref = [1.0]
+	
+	T = np.arange(0,10.0,0.01)
+	sys = (G,K,[],L,1,0)
+	x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
+	# sys = (G,K,[],L,0,1) # try this, it'll cause an error
+
+	M = sl.MDL(sys,x0,"this")
+	x0 = np.transpose(np.matrix(M.x0))
+
+	T,X = ode.rungekutta4(M.der, x_ref,T, x0 )
+	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
+	
+	print T[-1]
+	print X[-1]
+	print Y[-1]
+	plt.plot(T,[np.array(x)[:,0] for x in X])
+	plt.show()
 
 
 

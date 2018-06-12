@@ -97,7 +97,7 @@ def rungekutta4(f, *args):
 		
 		x = x+ (k1+2*k2+2*k3+k4)/6*dt
 		X.append(x)
-		T.append(t)
+		T.append(t+dt)
 	return T,X
 
 def rungekutta4ad(f, *args, **kwargs):

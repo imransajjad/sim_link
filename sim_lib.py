@@ -93,7 +93,7 @@ def div():
 
 
 def inv():
-	""" inverse two signals out=1/u """
+	""" inverse a signal out=1/u """
 	# def der(t,x,u):
 	# 	xdot = x[0:0]
 	# 	return xdot
@@ -108,8 +108,10 @@ def inv():
 	inv.cstates = 0
 	inv.passargs = [0]
 
+
+
 def sat():
-	""" inverse two signals out=1/u """
+	""" saturate by -1,1 """
 	# def der(t,x,u):
 	# 	xdot = x[0:0]
 	# 	return xdot
@@ -125,7 +127,7 @@ def sat():
 	sat.passargs = [0]
 
 def sgn():
-	""" inverse two signals out=1/u """
+	""" signum function """
 	# def der(t,x,u):
 	# 	xdot = x[0:0]
 	# 	return xdot
@@ -141,7 +143,7 @@ def sgn():
 	sgn.passargs = [0]
 
 def time():
-	""" add two signals out=a+b """
+	""" output time as a signal """
 	# def der(t,x,a,b):
 	# 	return x[0:0]
 	def out(t,x):
@@ -153,6 +155,51 @@ def time():
 	time.inargs = 0
 	time.cstates = 0
 	time.passargs = []
+
+
+def sin():
+	""" sin(u) """
+	def out(t,x,u):
+		return np.sin(u)
+
+	sin.out = out
+	sin.namestring = "sin"
+	sin.inargs = 1
+	sin.cstates = 0
+	sin.passargs = [0]
+
+def cos():
+	""" cos(u) """
+	def out(t,x,u):
+		return np.cos(u)
+
+	cos.out = out
+	cos.namestring = "cos"
+	cos.inargs = 1
+	cos.cstates = 0
+	cos.passargs = [0]
+
+def exp():
+	""" exp(u) """
+	def out(t,x,u):
+		return np.exp(u)
+
+	exp.out = out
+	exp.namestring = "exp"
+	exp.inargs = 1
+	exp.cstates = 0
+	exp.passargs = [0]
+
+def log():
+	""" log(u) """
+	def out(t,x,u):
+		return np.log(u)
+
+	log.out = out
+	log.namestring = "log"
+	log.inargs = 1
+	log.cstates = 0
+	log.passargs = [0]
 
 
 class gain(object):
@@ -189,6 +236,39 @@ class const(object):
 	# 	return xdot
 	def out(self,t,x):
 		return self.C
+
+
+class power(object):
+	"""docstring for power"""
+	def __init__(self, n):
+		# super(power, self).__init__()
+		self.n = n
+
+		self.namestring = "power (" + str(self.n) + ")"
+
+		self.inargs = 1
+		self.cstates = 0
+		self.passargs = [0]
+
+	def out(self,t,x,u):
+		return np.power(u,self.n)
+
+
+class selector(object):
+	"""docstring for selector"""
+	def __init__(self, switches):
+		# super(selector, self).__init__()
+		self.sw = switches
+
+		self.namestring = "selector (" + str(self.sw) + ")"
+
+		self.inargs = 1
+		self.cstates = 0
+		self.passargs = [0]
+
+	def out(self,t,x,u):
+		return u[self.sw]
+		
 
 
 class integrator_multi(object):
