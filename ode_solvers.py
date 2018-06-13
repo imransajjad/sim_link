@@ -195,10 +195,10 @@ def rungekutta4ad(f, *args, **kwargs):
 				Ttarget = args[-2][ti]
 				cur_time = time.time()
 				while (cur_time-sys_time) < (args[-2][ti]-args[-2][ti-1]):
-					if P["plotcall"] and cur_time > plot_time+0.07:
+					if P["plotcall"] and (cur_time > plot_time+0.1):
 						P["plotcall"](T,X,Y)
 						plot_time = cur_time
-						cur_time = time.time()
+						# cur_time = time.time()
 
 					cur_time = time.time()
 				sys_time = cur_time

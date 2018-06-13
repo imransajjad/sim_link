@@ -4,7 +4,7 @@
 most functions are written and tested to support numpy matrices"""
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 
 def int1():
@@ -220,6 +220,23 @@ class gain(object):
 		y = self.k*u
 		return y
 
+class step(object):
+	""" step block out = 1*(t>ts) """
+	def __init__(self,ts):
+		self.ts = ts
+
+		self.namestring = "step (ts=" + str(self.ts) + "s)"
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+
+	# def der(self,t,x,u):
+	# 	xdot = x[0:0]
+	# 	return xdot
+	def out(self,t,x):
+		return np.matrix([1.0*(t>self.ts)])
+
 class const(object):
 	""" const block out = C """
 	def __init__(self,C):
@@ -383,21 +400,67 @@ class joystick_input(object):
 		return joy_out
 
 
-# def plot(T,X,*args,**kwargs):
-# 	data = {"states": [], "probes": []}
-# 	plot.statics = {"stateplots": [], "outplots": [], "plots_exist", False}
-# 	data.update(kwargs)
-
-# 	if plot
-
-# 	for s in states:
 
 
+class plot_window(object):
+	"""docstring for plot_window"""
+	def __init__(self, cstates,*probe_list):
+		super(plot_window, self).__init__()
+		self.probe_list = probe_list
+
+		self.fig, (self.ax1, self.ax2) = plt.subplots(2,1)
+		self.states = self.ax1.plot(*( [[]]*(2*cstates) ))
+		self.outs = self.ax2.plot  (*( [[]]*(2*len(probe_list)) ))
+		
+
+		self.ax1.figure.canvas.draw()
+		self.ax2.figure.canvas.draw()
+
+		self.Tlim = 1.0
+		self.xlim = [-1.0,1.0]
+		self.ylim = [-1.0,1.0]
+
+		self.ax1.set_xlim(0.0,1.0)
+		self.ax2.set_xlim(0.0,1.0)
+		self.ax1.set_ylim(-1.0,1.0)
+		self.ax2.set_ylim(-1.0,1.0)
 
 
 
+		self.ax1.grid()
 
-	
-	
+	def animate(self,T,X,*args):
+		# self.ax1.figure.canvas.draw()
+		# self.ax2.figure.canvas.draw()
 
+		while T[-1] > self.Tlim:
+			self.Tlim = 2* self.Tlim
+			self.ax1.set_xlim(0.0, self.Tlim)
+			self.ax2.set_xlim(0.0, self.Tlim)
+			# Tmin is assumed to be non decreasing
 
+		this_x = np.array(X)
+		for i,l in enumerate(self.states):
+			l.set_data(T, this_x[:,i] )
+			while np.amin( this_x[-1,i] ) < self.xlim[0]:
+				self.xlim[0] = 2*self.xlim[0]
+				self.ax1.set_ylim(self.xlim[0],self.xlim[1])
+			while np.amax( this_x[-1,i] ) > self.xlim[1]:
+				self.xlim[1] = 2*self.xlim[1]
+				self.ax1.set_ylim(self.xlim[0],self.xlim[1])
+
+		if args and self.probe_list:
+			this_y = np.array([ y.probe_s(*self.probe_list) for y in args[0]])
+			for i,l in enumerate(self.outs):
+				l.set_data(T,  this_y[:,i] )
+				while np.amin( this_y[-1,i] ) < self.ylim[0]:
+					self.ylim[0] = 2*self.ylim[0]
+					self.ax2.set_ylim(self.ylim[0],self.ylim[1])
+				while np.amax( this_y[-1,i] ) > self.ylim[1]:
+					self.ylim[1] = 2*self.ylim[1]
+					self.ax2.set_ylim(self.ylim[0],self.ylim[1])
+
+		plt.pause(0.0000001)
+
+	def show(self):
+		plt.show()

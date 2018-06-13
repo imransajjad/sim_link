@@ -373,7 +373,6 @@ class MDL(object):
 		if not len(inputs) == self.inargs:
 			print "I ", self, " need ", self.inargs, " but received:"
 			print inputs
-			print 
 			raise AssertionError()
 		for i in range(0,self.inargs):
 			R[self.argmap[i]] = inputs[i]

@@ -3,10 +3,6 @@ import ode_solvers as ode
 import sim_link as sl
 import sim_lib as sll
 
-import matplotlib
-# matplotlib.use('GTKAgg')
-import matplotlib.pyplot as plt
-
 def B():
 
 	def der(t,x,b):
@@ -193,71 +189,29 @@ def test1():
 	plt.show()
 
 
-class plot_window(object):
-	"""docstring for plot_window"""
-	def __init__(self, cstates,*probe_list):
-		super(plot_window, self).__init__()
-		self.probe_list = probe_list
-
-		self.fig, (self.ax1, self.ax2) = plt.subplots(2,1)
-		self.states = self.ax1.plot(*( [[]]*(2*cstates) ))
-		self.outs = self.ax2.plot  (*( [[]]*(2*len(probe_list)) ))
-		self.ax2.set_ylim(-4,4)
-
-
-		self.ax1.grid()
-
-	def animate(self,T,X,*args):
-		self.ax1.figure.canvas.draw()
-		self.ax2.figure.canvas.draw()
-
-		this_x = np.array(X)
-		for i,l in enumerate(self.states):
-			l.set_data(T, this_x[:,i] )
-		self.ax1.set_xlim(0, max(T))
-		self.ax1.set_ylim(np.amin(this_x),np.amax(this_x))
-
-
-		if args and self.probe_list:
-			this_y = np.array([ y.probe_s(*self.probe_list) for y in args[0]])
-			# print "here"
-			# print this_x
-			# print this_y	
-			self.ax2.set_xlim(0, max(T))
-			# self.ax2.set_ylim(np.amin(this_y),np.amax(this_y))
-			for i,l in enumerate(self.outs):
-				l.set_data(T,  this_y[:,i] )
-
-		plt.pause(0.00001)
-
-		
-
-
-
-
 
 def test2():
 
 
-	T = np.arange(0,4.0,0.01)
-	sys = (G,K,sll.gain(3.7),sll.add,sll.sgn,sll.fun_gen(A=3.0),sll.gain(5.0),sll.const(1.0),L,1,0)
+	T = np.arange(0,20.0,0.01)
+	sys = (G,K,sll.gain(3.7),sll.add,sll.sgn,sll.fun_gen(A=3.0),sll.step(5.0),L,1,0)
 	x0 = ([1.0, 0.6],[],[],[],[],[0.0,0.0],[],[],[])
 
-	sys = (sll.sub,sll.int1,sll.fun_gen(A=0.0,omega=0.0,bias=1.0),sll.time)
-	x0 = ([],[0.0],[],[],[])
+	# sys = (sll.sub,sll.int1,sll.fun_gen(A=1.0,omega=2*np.pi*2.0,bias=1.0),sll.time)
+	# x0 = ([],[0.0],[],[],[])
 
 
 	# sys = (G,K,x_ref,L,0,1)
 	M = sl.MDL(sys,x0,"this")
 
 
-	PW = plot_window(1,[0],[1],[2],[3])
+	PW = sll.plot_window(1,[0],[2])
 
 	x0 = np.transpose(np.matrix(M.x0))
 	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.out, \
 		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=PW.animate)
 
-	plt.show()
+	PW.show()
 
 
 	
@@ -266,7 +220,6 @@ def test2():
 	print X[-1]
 	# print Y[-1]
 
-	# animate.hold()
 
 def test4():
 
