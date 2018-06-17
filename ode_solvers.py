@@ -31,6 +31,7 @@ pp. 704-716, 1992.
 
 """
 import time
+from math import sqrt
 
 
 
@@ -111,7 +112,7 @@ def rungekutta4ad(f, *args, **kwargs):
 	X = [x]
 
 	P = {"min_dt": 1e-5, "e_tol": 1e-6, "gain": 0.04, "adaptive": False,\
-	 "realtime": False, "outcall": None, "plotcall": None}
+	 "realtime": False, "outcall": None, "plotcalls": []}
 	P.update(kwargs)
 
 	O = 7
@@ -151,7 +152,7 @@ def rungekutta4ad(f, *args, **kwargs):
 		Y.append( P["outcall"](t,x, *args[0:-2]) )
 
 	print "ode_solver with config"
-	print P
+	for p in P.keys():	print p+":", P[p]
 
 	while t < Ttarget:
 		
@@ -163,7 +164,7 @@ def rungekutta4ad(f, *args, **kwargs):
 		if P["adaptive"]:
 			graddn = sum([k[i]*b for i,b in enumerate(Bdn)])
 			E =gradup-graddn
-			E = sum([e*e for e in E])
+			E = sqrt(sum([e*e for e in E]))
 
 			margin = float(E/P["e_tol"])
 			# print margin, t
@@ -195,8 +196,9 @@ def rungekutta4ad(f, *args, **kwargs):
 				Ttarget = args[-2][ti]
 				cur_time = time.time()
 				while (cur_time-sys_time) < (args[-2][ti]-args[-2][ti-1]):
-					if P["plotcall"] and (cur_time > plot_time+0.1):
-						P["plotcall"](T,X,Y)
+					if P["plotcalls"] and (cur_time > plot_time+0.1):
+						for p in P["plotcalls"]:
+							p(T,X,* ((Y,) if P["outcall"] else ()) )
 						plot_time = cur_time
 						# cur_time = time.time()
 
@@ -208,8 +210,9 @@ def rungekutta4ad(f, *args, **kwargs):
 			
 		
 
-	if P["plotcall"] and t >= Tf:
-		P["plotcall"](T,X,Y)
+	if P["plotcalls"] and t >= Tf:
+		for p in P["plotcalls"]:
+			p(T,X,* ( (Y,) if P["outcall"] else () ) )
 
 	if not P["outcall"]:
 		return T,X

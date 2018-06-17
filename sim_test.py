@@ -194,7 +194,7 @@ def test2():
 
 
 	T = np.arange(0,20.0,0.01)
-	sys = (G,K,sll.gain(3.7),sll.add,sll.sgn,sll.fun_gen(A=3.0),sll.step(5.0),L,1,0)
+	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=3.0,omega=2),sll.step(5.0),L,1,0)
 	x0 = ([1.0, 0.6],[],[],[],[],[0.0,0.0],[],[],[])
 
 	# sys = (sll.sub,sll.int1,sll.fun_gen(A=1.0,omega=2*np.pi*2.0,bias=1.0),sll.time)
@@ -203,18 +203,19 @@ def test2():
 
 	# sys = (G,K,x_ref,L,0,1)
 	M = sl.MDL(sys,x0,"this")
+	M.print_table()
 
 
-	PW = sll.plot_window(1,[0],[2])
+	PW = sll.plot_window([0,1], [6,0], [6,1] )
+	PW2 = sll.plot_window([0], [5], [2], [0], plot_separate=False, active_draw=True)
+	fig, ax = PW.return_axes()
+	ax[1].set_xlabel("no time?")
 
 	x0 = np.transpose(np.matrix(M.x0))
 	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.out, \
-		adaptive=False, min_dt=1e-3, e_tol=1e-4, realtime=True, plotcall=PW.animate)
+		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate,PW2.animate])
 
 	PW.show()
-
-
-	
 	
 	print T[-1]
 	print X[-1]
@@ -222,6 +223,7 @@ def test2():
 
 
 def test4():
+	import matplotlib.pyplot as plt
 
 
 	T = np.arange(0,5.0,0.01)
@@ -231,20 +233,24 @@ def test4():
 	x0_1 = ([1.0, 0.6],[],[],[],[0.0,0.0])
 
 	M1 = sl.MDL(sys_1, x0_1, "Model KGL1")
+	# M1.print_table()
 
 	sys_2 = (G,K,M1,[],L,1,0)
 	x0_2 = ([1.5, 0.6],[],M1.x0,[],[0.0,0.0],[],[])
 
 	M2 = sl.MDL(sys_2, x0_2, "Model KGL21")
+	# M2.print_table()
 
 	sys_12 = (M1,M2,D,ES,[])
 	x0_12 =(M1.x0,M2.x0,[0.0,0.0],[],[],[])
 
 	M = sl.MDL(sys_12 ,x0_12, "Model KGL1+KGL21-G")
 	assert sl.verify(M)
+	M.print_table()
 
 	M = sl.unpack_MDL(M)
 	assert sl.verify(M)
+	M.print_table()
 
 	# M.out(0.0,x0,d_in)
 	x0 = np.transpose(np.matrix(M.x0))
@@ -291,6 +297,7 @@ def test0():
 
 
 def test8():
+	import matplotlib.pyplot as plt
 	x_ref = [1.0]
 	
 	T = np.arange(0,10.0,0.01)
@@ -301,7 +308,7 @@ def test8():
 	M = sl.MDL(sys,x0,"this")
 	x0 = np.transpose(np.matrix(M.x0))
 
-	T,X = ode.rungekutta4(M.der, x_ref,T, x0 )
+	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
 	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
 	
 	print T[-1]
@@ -314,4 +321,4 @@ def test8():
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test2()
+	test4()

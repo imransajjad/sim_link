@@ -404,62 +404,121 @@ class joystick_input(object):
 
 class plot_window(object):
 	"""docstring for plot_window"""
-	def __init__(self, cstates,*probe_list):
+	def __init__(self, cstates_i,*probe_list, **kwargs):
 		super(plot_window, self).__init__()
 		self.probe_list = probe_list
 
-		self.fig, (self.ax1, self.ax2) = plt.subplots(2,1)
-		self.states = self.ax1.plot(*( [[]]*(2*cstates) ))
-		self.outs = self.ax2.plot  (*( [[]]*(2*len(probe_list)) ))
-		
+		P = {"xlegend": [str(i) for i in cstates_i],\
+		 "ylegend": [str(p) for p in probe_list],\
+		 "tlabel": "time (s)",\
+		 "xlabel": "states",\
+		 "ylabel": "outs",\
+		 "plot_separate": True,\
+		 "active_draw": False}
+		P.update(kwargs)
 
-		self.ax1.figure.canvas.draw()
-		self.ax2.figure.canvas.draw()
+		self.active_draw = P["active_draw"]
+
+		if P["plot_separate"]:
+			self.fig, (ax1,ax2) = plt.subplots(2,1)
+			self.axes = [ax1,ax2]
+		else:
+			print "here"
+			self.fig, ax1 = plt.subplots(1,1)
+			self.axes = [ax1,ax1]
+			P["xlegend"] = P["xlegend"]+P["ylegend"]
+			P["ylegend"] = P["xlegend"]
+			
+			if not cstates_i : P["xlabel"] = ""
+			if not probe_list : P["ylabel"] = ""
+			sep = " + " if cstates_i and probe_list else ""
+
+			P["xlabel"] = P["xlabel"] + sep + P["ylabel"]
+			P["ylabel"] = P["xlabel"]
+
+		self.states = self.axes[0].plot(*( [[]]*(2*len(cstates_i)) ))
+		self.axes[0].legend(P["xlegend"])
+		self.axes[0].set_ylabel(P["xlabel"])
+
+		if probe_list:
+			self.outs = self.axes[1].plot  (*( [[]]*(2*len(probe_list)) ))
+			self.axes[1].legend(P["ylegend"])
+			self.axes[1].set_ylabel(P["ylabel"])
+			self.axes[1].set_xlabel(P["tlabel"])
+		else:
+			self.fig, (self.axes[0]) = plt.subplots(1,1)
+			self.axes[0].set_xlabel(P["tlabel"])
+
+
+
 
 		self.Tlim = 1.0
 		self.xlim = [-1.0,1.0]
-		self.ylim = [-1.0,1.0]
+		self.axes[0].set_xlim(0.0,1.0)
+		self.axes[0].set_ylim(-1.0,1.0)
+		self.axes[0].grid()
 
-		self.ax1.set_xlim(0.0,1.0)
-		self.ax2.set_xlim(0.0,1.0)
-		self.ax1.set_ylim(-1.0,1.0)
-		self.ax2.set_ylim(-1.0,1.0)
+		if probe_list:
+			
+			self.axes[1].set_xlim(0.0,1.0)
+			self.axes[1].set_ylim(-1.0,1.0)
+			if P["plot_separate"]:
+				self.axes[1].grid()
+				self.ylim = [-1.0,1.0]
+			else:
+				self.ylim = self.xlim
 
+	def return_axes(self):
+		return self.fig, self.axes
 
-
-		self.ax1.grid()
 
 	def animate(self,T,X,*args):
-		# self.ax1.figure.canvas.draw()
-		# self.ax2.figure.canvas.draw()
+		
 
 		while T[-1] > self.Tlim:
-			self.Tlim = 2* self.Tlim
-			self.ax1.set_xlim(0.0, self.Tlim)
-			self.ax2.set_xlim(0.0, self.Tlim)
+			self.Tlim = 1.25* self.Tlim
+			self.axes[0].set_xlim(0.0, self.Tlim)
+			if args and self.probe_list:
+				self.axes[1].set_xlim(0.0, self.Tlim)
 			# Tmin is assumed to be non decreasing
 
 		this_x = np.array(X)
 		for i,l in enumerate(self.states):
 			l.set_data(T, this_x[:,i] )
-			while np.amin( this_x[-1,i] ) < self.xlim[0]:
-				self.xlim[0] = 2*self.xlim[0]
-				self.ax1.set_ylim(self.xlim[0],self.xlim[1])
-			while np.amax( this_x[-1,i] ) > self.xlim[1]:
-				self.xlim[1] = 2*self.xlim[1]
-				self.ax1.set_ylim(self.xlim[0],self.xlim[1])
+	
+			x_new = this_x[-1,i]
+			if (x_new <= self.xlim[0]) or (x_new >= self.xlim[1]):
+				x_min = min( np.amin( this_x[:,i] ), self.xlim[0])
+				x_max = max( np.amax( this_x[:,i] ), self.xlim[1])
+				
+				self.xlim[0] = 0.5*x_max+0.5*x_min - 1.0*(x_max-x_min)
+				self.xlim[1] = 0.5*x_max+0.5*x_min + 1.0*(x_max-x_min)
+				self.axes[0].set_ylim(self.xlim[0],self.xlim[1])
+			
 
 		if args and self.probe_list:
 			this_y = np.array([ y.probe_s(*self.probe_list) for y in args[0]])
+			# print this_y
 			for i,l in enumerate(self.outs):
+				# print this_y[:,i]
 				l.set_data(T,  this_y[:,i] )
-				while np.amin( this_y[-1,i] ) < self.ylim[0]:
-					self.ylim[0] = 2*self.ylim[0]
-					self.ax2.set_ylim(self.ylim[0],self.ylim[1])
-				while np.amax( this_y[-1,i] ) > self.ylim[1]:
-					self.ylim[1] = 2*self.ylim[1]
-					self.ax2.set_ylim(self.ylim[0],self.ylim[1])
+				
+				y_new = this_y[-1,i]
+				if (y_new <= self.ylim[0]) or (y_new >= self.ylim[1]):
+					y_min = min( np.amin( this_y[:,i] ), self.ylim[0])
+					y_max = max( np.amax( this_y[:,i] ), self.ylim[1])
+					self.ylim[0] = 0.5*y_max+0.5*y_min - 1.0*(y_max-y_min)
+					self.ylim[1] = 0.5*y_max+0.5*y_min + 1.0*(y_max-y_min)
+					self.axes[1].set_ylim(self.ylim[0],self.ylim[1])
 
+		self.draw()
+
+		
+	def draw(self):
+		if self.active_draw:
+			for i in self.axes:
+				i.figure.canvas.draw()	
+			# self.fig.canvas.draw()
 		plt.pause(0.0000001)
 
 	def show(self):

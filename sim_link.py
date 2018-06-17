@@ -31,6 +31,7 @@ def L():
 	L.der = der
 	L.out = out
 
+	L.namestring = "Observer L"
 	L.inargs = 2 # number of continous states
 	L.cstates = 2 # number of input arguments in addition to t and x
 	L.passargs = [1] # indices of input arguments actually used in L.out
@@ -49,7 +50,7 @@ When providing a tuple to the system think of it as unpacking an expression:
 
 G(K(x_ref,L(K(...),G(...))))  => (G,K,x_ref,L,1,0)
 
-I cannot emphasize this enough. There is no guarantee that an arbitrary 
+Note: There is no guarantee that an arbitrary 
 expression like the one on the right will work, but I've tried my best
 to make the ones on the left work for all cases
 
@@ -65,7 +66,7 @@ For example, here is test code for the system:
 
            ------         ------
 x_ref --->|  K   |------>|  G   |-------->
-          ------    |     ------   |
+           ------   |     ------   |
              ^      V              |
              |    ------           |
               ---|  L   |<---------
@@ -79,10 +80,10 @@ the signals on the wires should be evaluated in the order G,L,K
 import numpy as np
 import ode_solvers as ode
 import sim_link as sl
-import matplotlib.pyplot as plt
 
 
-def test2():
+def test8():
+	import matplotlib.pyplot as plt
 	x_ref = [1.0]
 	
 	T = np.arange(0,10.0,0.01)
@@ -93,8 +94,8 @@ def test2():
 	M = sl.MDL(sys,x0,"this")
 	x0 = np.transpose(np.matrix(M.x0))
 
-	T,X = ode.rungekutta4(M.der, x_ref,T, x0 )
-	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
+	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
+	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
 	
 	print T[-1]
 	print X[-1]
@@ -139,7 +140,7 @@ Basic ideas:
     Since the state is not stored inside the functions themselves, 'two or more'
     of the same system will act as two separate systems and their states and 
     results will be stored separately, for example if A(s) = 1/s
-        A(A(in)) <=> (A,A,[in]) => 1/s^2
+        A(A(in)) => (A,A,[in]) => 1/s^2
     If you want to use the result of a function twice, use references (ints)
 
 7. Since MDL objects also act as dynamical system functions
@@ -181,6 +182,9 @@ I don't want to use isinstance and hasattr so much
 
 import copy, traceback
 
+passArgModeDeep = False
+# properly implementing deep passarg mode might involve splitting
+# execution tables and may be too complicated
 
 class out_list(list):
 	"""docstring for out_list"""
@@ -195,8 +199,20 @@ class out_list(list):
 	def __getitem__(self, index):
 		return self.getfirstitem(index)
 	def probe(self, *indices):
+		# use this recursive function with caution
+		# usually the deepest extracted element is assumed to be a scalar
+		# in case there are elements left in index and the current deepest
+		# element is not a scalar, new_item[indices[1:]] is called which is
+		# equivalent to new_item[2,3,1,...].
+		# so new_item should either have a scalar or a __getitem__ method
+		# that accepts tuples
+
 		if len(indices) > 1:
-			return self.getitemnormally(indices[0]).probe(*indices[1:])
+			new_item = self.getitemnormally(indices[0]);
+			if isinstance(new_item,out_list):
+				return new_item.probe(*indices[1:])
+			else:
+				return new_item[indices[1:]]
 		else:
 			return self.getfirstitem(indices[0])
 		# the altered getitem method is experimental, if in doubt use
@@ -204,6 +220,9 @@ class out_list(list):
 	def probe_s(self, *probe_indices):
 		return [self.probe(*i) for i in probe_indices]
 	
+
+
+
 
 class MDL(object):
 	"""docstring for MDL"""
@@ -235,7 +254,7 @@ class MDL(object):
 			self.x0 += x0_in[row[2]]
 
 		
-		self.print_table()
+		# self.print_table()
 		# print "x0: ", self.x0
 		# print "Done Initializing System:", namestring, "\n\n\n"
 
@@ -253,13 +272,13 @@ class MDL(object):
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
 		
-		self.ETflag[0] = self.verify_table()
+		self.verify_table()
 		self.argmap = [i for i,r in enumerate(self.ETregister) \
 						if isinstance(r,list)]
 		
 		self.inargs = len(self.argmap)
 		self.cstates = sum([row[0].cstates for row in self.ET ])
-		self.passargs = [i for i, p in enumerate([self.isPassArg(i,False) \
+		self.passargs = [i for i, p in enumerate([self.isPassArg(i,passArgModeDeep) \
 						for i in self.argmap]) if p]
 		
 		return self.ETflag[0]
@@ -327,9 +346,9 @@ class MDL(object):
 
 
 	def verify_table(self):
-
+		# only this function can set self.ETflag[0] to True
+		self.ETflag[0] = True
 		try:
-			
 			inputs = [[row[1][i] for i in row[0].passargs] for row in self.ET ]
 			# find row number containing
 			for k,cur_row in enumerate(self.ET):
@@ -344,11 +363,14 @@ class MDL(object):
 						
 						
 		except Exception as e:
+			self.ETflag[0] = False
 			self.print_table()
 			print "verification failed"
 			traceback.print_exc()
 
-		return True
+		
+
+		
 
 	def isPassArg(self,argi,deep):
 		# first find row(s)
@@ -362,7 +384,7 @@ class MDL(object):
 			elif any([n==0 for n in next_args]):
 				return True
 			else:
-				return any([self.isPassArg(n) for n in next_args])
+				return any([self.isPassArg(n,passArgModeDeep) for n in next_args])
 		else:
 			return [ argi for row in self.ET if argi in [ row[1][i] \
 					for i in row[0].passargs ]  ]
@@ -616,10 +638,10 @@ def unpack_MDL(M):
 
 	Mnew.ET = Nrows
 	Mnew.ETregister = Nreg
-	Mnew.ETflag[0] = Mnew.verify_table()
+	Mnew.verify_table()
 	Mnew.ETvalid = [0]*len(Nreg)
 
-	Mnew.print_table()
+	# Mnew.print_table()
 
 	assert Mnew.ETflag[0]
 
