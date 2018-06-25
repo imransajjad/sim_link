@@ -488,12 +488,7 @@ class plot_window(object):
 	
 			x_new = this_x[-1,i]
 			if (x_new <= self.xlim[0]) or (x_new >= self.xlim[1]):
-				x_min = min( np.amin( this_x[:,i] ), self.xlim[0])
-				x_max = max( np.amax( this_x[:,i] ), self.xlim[1])
-				
-				self.xlim[0] = 0.5*x_max+0.5*x_min - 1.0*(x_max-x_min)
-				self.xlim[1] = 0.5*x_max+0.5*x_min + 1.0*(x_max-x_min)
-				self.axes[0].set_ylim(self.xlim[0],self.xlim[1])
+				self.fix_axes(this_x, 0)
 			
 
 		if args and self.probe_list:
@@ -505,13 +500,21 @@ class plot_window(object):
 				
 				y_new = this_y[-1,i]
 				if (y_new <= self.ylim[0]) or (y_new >= self.ylim[1]):
-					y_min = min( np.amin( this_y[:,i] ), self.ylim[0])
-					y_max = max( np.amax( this_y[:,i] ), self.ylim[1])
-					self.ylim[0] = 0.5*y_max+0.5*y_min - 1.0*(y_max-y_min)
-					self.ylim[1] = 0.5*y_max+0.5*y_min + 1.0*(y_max-y_min)
-					self.axes[1].set_ylim(self.ylim[0],self.ylim[1])
+					self.fix_axes(this_y, 1)
 
 		self.draw()
+
+	def fix_axes(self,this_x, ax_num):
+		if ax_num == 0:
+			lim = self.xlim
+		elif ax_num == 1:
+			lim = self.ylim
+		x_min = min( np.amin( this_x[:,:] ), lim[0])
+		x_max = max( np.amax( this_x[:,:] ), lim[1])
+		
+		lim[0] = 0.5*x_max+0.5*x_min - 1.0*(x_max-x_min)
+		lim[1] = 0.5*x_max+0.5*x_min + 1.0*(x_max-x_min)
+		self.axes[ax_num].set_ylim(lim[0],lim[1])
 
 		
 	def draw(self):

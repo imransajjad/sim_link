@@ -2,6 +2,7 @@ import numpy as np
 import ode_solvers as ode
 import sim_link as sl
 import sim_lib as sll
+import time
 
 def B():
 
@@ -191,7 +192,7 @@ def test1():
 
 
 def test2():
-
+	import matplotlib.pyplot as plt
 
 	T = np.arange(0,20.0,0.01)
 	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=3.0,omega=2),sll.step(5.0),L,1,0)
@@ -207,15 +208,17 @@ def test2():
 
 
 	PW = sll.plot_window([0,1], [6,0], [6,1] )
-	PW2 = sll.plot_window([0], [5], [2], [0], plot_separate=False, active_draw=True)
+	# PW2 = sll.plot_window([0], [5], [2], [0], plot_separate=False, active_draw=True)
 	fig, ax = PW.return_axes()
 	ax[1].set_xlabel("no time?")
 
 	x0 = np.transpose(np.matrix(M.x0))
 	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.out, \
-		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate,PW2.animate])
+		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate])
 
 	PW.show()
+	plt.plot(T)
+	plt.show()
 	
 	print T[-1]
 	print X[-1]
@@ -248,9 +251,9 @@ def test4():
 	assert sl.verify(M)
 	M.print_table()
 
-	M = sl.unpack_MDL(M)
-	assert sl.verify(M)
-	M.print_table()
+	# M = sl.unpack_MDL(M)
+	# assert sl.verify(M)
+	# M.print_table()
 
 	# M.out(0.0,x0,d_in)
 	x0 = np.transpose(np.matrix(M.x0))
@@ -318,7 +321,61 @@ def test8():
 	plt.show()
 
 
+def test7():
+
+	T = np.arange(0,10.0,0.01)
+
+	sys1 = (G,K,[],L,1,0)
+	x01 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
+	M1 = sl.MDL(sys1,x01,'sys1')
+	M1.print_table()
+
+	sys2 = (G,K,[],L,1,0)
+	x02 = ([0.0, 0.0],[],[],[0.0,0.0],[],[],[])
+	M2 = sl.MDL(sys2,x02,'sys2')
+	M2.print_table()
+
+	x_in = np.matrix('8.0')
+
+	sys = (sll.gain(5.2),M1,sll.sub,[],M2,0)
+	x0 = ([],M1.x0,[],[],M2.x0,[])
+
+	M = sl.MDL(sys, x0, 'false algebraic loop')
+	M.print_table()
+	# M = sl.unpack_MDL(M)
+	# M.print_table()
+
+
+	PW = sll.plot_window([0,1],[0],[1,0])
+	fig, axes = PW.return_axes()
+	axes[1].legend(['out','sys1-G'])
+	
+	x0 = np.transpose(np.matrix(M.x0))
+	y0 = M.all_out(T[0], x0, x_in)
+	print y0
+
+	print [ y0[i] for i in range(0,len(y0))]
+	dx0 = M.der(T[0], x0, x_in)
+	print dx0
+
+	sys_time = time.time()
+	T,X,Y = ode.rungekutta4ad(M.der, x_in, T, x0 , outcall=M.all_out, \
+		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate])
+	print time.time()-sys_time
+
+	PW.show()
+	
+	print T[-1]
+	print X[-1]
+	print Y[-1].probe_s([0],[1,0],[1,1])
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test2()
+	test7()

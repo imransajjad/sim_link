@@ -48,7 +48,7 @@ Step 2: Connect such systems together and evaluate
 
 When providing a tuple to the system think of it as unpacking an expression:
 
-G(K(x_ref,L(K(...),G(...))))  => (G,K,x_ref,L,1,0)
+G(K(x_ref,L(K(...),G(...))))  => (G,K,[],L,1,0)
 
 Note: There is no guarantee that an arbitrary 
 expression like the one on the right will work, but I've tried my best
@@ -182,7 +182,7 @@ I don't want to use isinstance and hasattr so much
 
 import copy, traceback
 
-passArgModeDeep = False
+passArgModeDeep = True
 # properly implementing deep passarg mode might involve splitting
 # execution tables and may be too complicated
 
@@ -208,19 +208,16 @@ class out_list(list):
 		# that accepts tuples
 
 		if len(indices) > 1:
-			new_item = self.getitemnormally(indices[0]);
+			new_item = self.getitemnormally(indices[0])
 			if isinstance(new_item,out_list):
 				return new_item.probe(*indices[1:])
 			else:
 				return new_item[indices[1:]]
 		else:
 			return self.getfirstitem(indices[0])
-		# the altered getitem method is experimental, if in doubt use
-		# the go_deep() function
+
 	def probe_s(self, *probe_indices):
 		return [self.probe(*i) for i in probe_indices]
-	
-
 
 
 
@@ -247,11 +244,11 @@ class MDL(object):
 		# evaluate test and remap initial conditions
 		self.init_table() # build table
 
-		assert self.ETflag[0]
+		# assert self.ETflag[0]
 
 		self.x0 = []
 		for row in self.ET:
-			self.x0 += x0_in[row[2]]
+			self.x0 += x0_in[row[-1]]
 
 		
 		# self.print_table()
@@ -271,6 +268,8 @@ class MDL(object):
 			# print "build table pass"
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
+
+		self.table_rep_stride()
 		
 		self.verify_table()
 		self.argmap = [i for i,r in enumerate(self.ETregister) \
@@ -278,7 +277,7 @@ class MDL(object):
 		
 		self.inargs = len(self.argmap)
 		self.cstates = sum([row[0].cstates for row in self.ET ])
-		self.passargs = [i for i, p in enumerate([self.isPassArg(i,passArgModeDeep) \
+		self.passargs = [i for i, p in enumerate([self.isPassArg(i) \
 						for i in self.argmap]) if p]
 		
 		return self.ETflag[0]
@@ -327,7 +326,7 @@ class MDL(object):
 			# print exec_is
 			
 			# print "writing: ", args[N], exec_is, N, "\n"
-			self.ET.append( [args[N], exec_is, N ]  )
+			self.ET.append( [args[N], exec_is, args[N].cstates, N ]  )
 			
 			return N
 
@@ -344,6 +343,13 @@ class MDL(object):
 			if verbose:  print N, args[N], "found else", args[N]
 			return N
 
+	def table_rep_stride(self):
+		x_stride = 0
+		for row in self.ET:
+			row[2] = x_stride
+			x_stride += row[0].cstates
+
+
 
 	def verify_table(self):
 		# only this function can set self.ETflag[0] to True
@@ -352,7 +358,7 @@ class MDL(object):
 			inputs = [[row[1][i] for i in row[0].passargs] for row in self.ET ]
 			# find row number containing
 			for k,cur_row in enumerate(self.ET):
-				J = [ i for i,ins in enumerate(inputs) if cur_row[2] in ins]
+				J = [ i for i,ins in enumerate(inputs) if cur_row[-1] in ins]
 				# print "J: ",J
 				if J:
 					j = J[0]
@@ -372,10 +378,10 @@ class MDL(object):
 
 		
 
-	def isPassArg(self,argi,deep):
+	def isPassArg(self,argi):
 		# first find row(s)
-		if deep:
-			next_args = [ row[2] for row in self.ET \
+		if passArgModeDeep:
+			next_args = [ row[-1] for row in self.ET \
 					if argi in [ row[1][i] for i in row[0].passargs ]  ]
 			
 			# if no next arg needs argi
@@ -384,13 +390,22 @@ class MDL(object):
 			elif any([n==0 for n in next_args]):
 				return True
 			else:
-				return any([self.isPassArg(n,passArgModeDeep) for n in next_args])
+				return any([self.isPassArg(n) for n in next_args])
 		else:
 			return [ argi for row in self.ET if argi in [ row[1][i] \
 					for i in row[0].passargs ]  ]
 
-	def out(self,t,x,*inputs):
+	def out(self,t,x,*inputs,**kwargs):
+
+		# P["out_target"] == n evaluate till n out in self
+		# P["out_target"] == 0 evaluate till 0 out, (default)
+		# P["out_target"] == -1 evaluate till all outs in self
+		# P["out_target"] == -2 evaluate till all outs in self and MDL rows
+
 		R = out_list(self.ETregister) # y
+
+		P = {"out_target": 0}
+		P.update(kwargs)
 
 		if not len(inputs) == self.inargs:
 			print "I ", self, " need ", self.inargs, " but received:"
@@ -400,38 +415,58 @@ class MDL(object):
 			R[self.argmap[i]] = inputs[i]
 
 
-		x_stride = 0
 		for row in self.ET:
 			try:
 				# all R's should be first output signals, dive inside till true
 				# ins = go_deep([R[i] for i in row[1]])
-				ins = [R.getfirstitem(i) for i in row[1]]
-				
-				R[row[2]] = row[0].out(t,x[x_stride:x_stride+row[0].cstates], *ins )
-				x_stride += row[0].cstates
+				ins = [R[i] for i in row[1]]
+				R[row[-1]] = row[0].out(t,x[row[2]:row[2]+row[0].cstates], *ins )
+				if  row[-1] == P["out_target"]:
+					break
 			except Exception as e:
-				traceback.print_exc()
+				# traceback.print_exc()
 				print "Error in out from this model, row:"
 				print "I,", self.namestring, ", called"
-				print row
-				print "with states", x[x_stride:x_stride+row[0].cstates]
+				print row[0].namestring, row[1], row[2], row[-1]
+				print "with states", x[row[2]:row[2]+row[0].cstates]
 				print "with inputs", ins
 				raise e
 
+		if P["out_target"] == -2:
+			for row in self.ET:
+				if isinstance(row[0],MDL):
+					ins = [R[i] for i in row[1]]
+					R[row[-1]] = row[0].all_out(t,x[row[2]:row[2]+row[0].cstates], *ins )
+
+
 		return R
 
+	def reg_out(self,t,x,*inputs):
+		# called once every time der is called for self
+		# evaluates all outs in self register
+		return self.out(t,x,*inputs,out_target=-1)
+
+	def all_out(self,t,x,*inputs):
+		# more expensive but evaluates every level, call only for plotting deeper data
+		return self.out(t,x,*inputs,out_target=-2)
+
 	def der(self,t,x,*inputs):
-		R = self.out(t,x,*inputs)
-		
-		# # all R's should be first output signals, dive inside till true
-		# for i,r in enumerate(R):
-		# 	if not isinstance(R[i],int) and not hasattr(R[i],'out'):
-		# 		while not isinstance(R[i][0],float):
-		# 			R[i] = R[i][0]
+		R = self.reg_out(t,x,*inputs)
+		# R = out_list(self.ETregister) # y
+		# R_evaled = [False]*len(R)
+
+
+		# if not len(inputs) == self.inargs:
+		# 	print "I ", self, " need ", self.inargs, " but received:"
+		# 	print inputs
+		# 	raise AssertionError()
+		# for i in range(0,self.inargs):
+		# 	R[self.argmap[i]] = inputs[i]
+		# 	R_evaled[self.argmap[i]] = True
 
 		Dx = copy.copy(x)
 
-		x_stride = 0
+		# x_stride = 0
 		for row in self.ET:
 			try:
 				# print row
@@ -440,17 +475,19 @@ class MDL(object):
 				# all R's should be first output signals, dive inside till true
 				# ins = go_deep([R[i] for i in row[1]])
 				if row[0].cstates:
-					ins = [R.getfirstitem(i) for i in row[1]]
 
-					dx = row[0].der(t,x[x_stride:x_stride+row[0].cstates], *ins )
-					for xi in range(x_stride,x_stride+row[0].cstates):
-						Dx[xi] = dx[xi-x_stride]
-					x_stride += row[0].cstates
+					ins = [R[i] for i in row[1]]
+
+					dx = row[0].der(t,x[row[2]:row[2]+row[0].cstates], *ins )
+					for xi in range(row[2],row[2]+row[0].cstates):
+						Dx[xi] = dx[xi-row[2]]
 			except Exception as e:
-				traceback.print_exc()
+				# traceback.print_exc()
 				print "Error in der from this model, row:"
-				print self.namestring, row
-				print [R[i] for i in row[1]]
+				print "I,", self.namestring, ", called"
+				print row[0].namestring, row[1], row[2], row[-1]
+				print "with states", x[row[2]:row[2]+row[0].cstates]
+				print "with inputs", ins
 				raise e
 
 		return Dx
@@ -473,7 +510,7 @@ class MDL(object):
 			if not isinstance(row[0],list):
 				for i in row[0].passargs:
 					i_string[i] += "p"
-			print "	", row[0].namestring, ", ins:" , i_string, ", outs:", row[2]
+			print "	", row[0].namestring, ", ins:" , i_string, ", stride", row[2], ", outs:", row[-1]
 		print "Table valid: ", self.ETflag[0]
 		self.print_register()
 		if self.ETflag[0]:
@@ -503,36 +540,6 @@ def go_deep(ins):
 				ins[i] = ins[i][0]
 	return ins
 
-		
-# def init_MDL(sys,x0_in, namestring):
-
-# 	print "Initializing System:", namestring, "\n"
-	
-# 	for i in sys:
-# 		if callable(i):
-# 			try:
-# 				i()
-# 			except Exception as e:
-# 				print "Could not initialize System:", i
-# 				# traceback.print_exc()
-# 				pass
-
-# 	# evaluate test and remap initial conditions
-# 	M = MDL(namestring) # init and
-# 	M.init_table(sys) # build table
-
-# 	assert M.ETflag[0]
-
-# 	x0 = []
-# 	for row in M.ET:
-# 		x0 += x0_in[row[2]]
-
-	
-# 	M.print_table()
-# 	print "x0: ", x0
-# 	print "Done Initializing System:", namestring, "\n\n\n"
-
-	return M,x0
 
 def unpack_MDL(M):
 	# if a model consists of submodels, this will 'unpack' it's execution table
@@ -540,12 +547,12 @@ def unpack_MDL(M):
 	# does (should) not affect execution order or state variables
 
 	def offset_row(sub_row,ofs):
-		return [sub_row[0],[i+ofs for i in sub_row[1]], sub_row[2]+ofs]
+		return [sub_row[0],[i+ofs for i in sub_row[1]], sub_row[-1]+ofs]
 
 	def find_replace_inrow(sub_row,a,b):
 		# replace a with b in row
 		return [sub_row[0],[b if i==a else i for i in sub_row[1]], b \
-						if sub_row[2]==a else sub_row[2]]
+						if sub_row[-1]==a else sub_row[-1]]
 
 
 	def reg_extend(M):
@@ -565,7 +572,7 @@ def unpack_MDL(M):
 				# 	print row
 
 				# find index of matching row in ET
-				m = [ j for j,row in enumerate(Nrows) if row[2]==i][0] 
+				m = [ j for j,row in enumerate(Nrows) if row[-1]==i][0] 
 
 				# print m
 				
@@ -638,6 +645,7 @@ def unpack_MDL(M):
 
 	Mnew.ET = Nrows
 	Mnew.ETregister = Nreg
+	Mnew.table_rep_stride()
 	Mnew.verify_table()
 	Mnew.ETvalid = [0]*len(Nreg)
 
