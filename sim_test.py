@@ -346,7 +346,7 @@ def test7():
 	# M.print_table()
 
 
-	PW = sll.plot_window([0,1],[0],[1,0])
+	PW = sll.plot_window([0,1],[0], [1,0], plot_separate=False)
 	fig, axes = PW.return_axes()
 	axes[1].legend(['out','sys1-G'])
 	
@@ -358,10 +358,9 @@ def test7():
 	dx0 = M.der(T[0], x0, x_in)
 	print dx0
 
-	sys_time = time.time()
+	
 	T,X,Y = ode.rungekutta4ad(M.der, x_in, T, x0 , outcall=M.all_out, \
 		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate])
-	print time.time()-sys_time
 
 	PW.show()
 	

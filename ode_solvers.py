@@ -112,7 +112,7 @@ def rungekutta4ad(f, *args, **kwargs):
 	X = [x]
 
 	P = {"min_dt": 1e-5, "e_tol": 1e-6, "gain": 0.04, "adaptive": False,\
-	 "realtime": False, "outcall": None, "plotcalls": []}
+	 "realtime": False, "outcall": None, "plotcalls": [], "plottime" : 0.001}
 	P.update(kwargs)
 
 	O = 7
@@ -195,17 +195,20 @@ def rungekutta4ad(f, *args, **kwargs):
 			if ti < len_T:
 				Ttarget = args[-2][ti]
 				cur_time = time.time()
-				# print time.time()-sys_time , (args[-2][ti]-args[-2][ti-1])
-				if (time.time()-sys_time) < (args[-2][ti]-args[-2][ti-1]):
-					if P["plotcalls"] and (time.time() > plot_time+0.05):
+				# print "here plotting"
+				# print (args[-2][ti]-args[-2][ti-1]) - (time.time()-sys_time) > 0.001
+				if (args[-2][ti]-args[-2][ti-1]) - (time.time()-sys_time) > P["plottime"]:
+					plot_time = time.time()
+					if P["plotcalls"]:
 						# print "here2"
 						for p in P["plotcalls"]:
 							p(T,X,* ((Y,) if P["outcall"] else ()) )
-						plot_time = time.time()
+					# print time.time()-plot_time
+						
 						# cur_time = time.time()
 				# print time.time()-sys_time , (args[-2][ti]-args[-2][ti-1])
 				while (time.time()-sys_time) < (args[-2][ti]-args[-2][ti-1]):
-					# print "here"
+					# print "waiting"
 					pass
 
 					# cur_time = time.time()

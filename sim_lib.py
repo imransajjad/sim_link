@@ -5,7 +5,7 @@ most functions are written and tested to support numpy matrices"""
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+import time as time_sys
 
 def int1():
 	""" 1d, 1st order integrator"""
@@ -418,6 +418,8 @@ class plot_window(object):
 		P.update(kwargs)
 
 		self.active_draw = P["active_draw"]
+		self.drawn = False
+		self.start_time = 0.0
 
 		if P["plot_separate"]:
 			self.fig, (ax1,ax2) = plt.subplots(2,1)
@@ -455,54 +457,80 @@ class plot_window(object):
 		self.Tlim = 1.0
 		self.xlim = [-1.0,1.0]
 		self.axes[0].set_xlim(0.0,1.0)
-		self.axes[0].set_ylim(-1.0,1.0)
+		self.axes[0].set_ylim(-10.0,10.0)
 		self.axes[0].grid()
 
 		if probe_list:
 			
 			self.axes[1].set_xlim(0.0,1.0)
-			self.axes[1].set_ylim(-1.0,1.0)
+			self.axes[1].set_ylim(-10.0,10.0)
 			if P["plot_separate"]:
 				self.axes[1].grid()
 				self.ylim = [-1.0,1.0]
 			else:
 				self.ylim = self.xlim
 
+		
+
 	def return_axes(self):
 		return self.fig, self.axes
 
 
 	def animate(self,T,X,*args):
+
+		if self.drawn:
+			self.fig.canvas.restore_region(self.backgrounds[0])
+			self.fig.canvas.restore_region(self.backgrounds[1])
+		else:
+			self.fig.canvas.draw()
+			self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.axes]
 		
 
-		while T[-1] > self.Tlim:
-			self.Tlim = 1.25* self.Tlim
-			self.axes[0].set_xlim(0.0, self.Tlim)
-			if args and self.probe_list:
-				self.axes[1].set_xlim(0.0, self.Tlim)
-			# Tmin is assumed to be non decreasing
+		self.fix_time(T)
+
 
 		this_x = np.array(X)
-		for i,l in enumerate(self.states):
-			l.set_data(T, this_x[:,i] )
+		for i,trace in enumerate(self.states):
+			trace.set_data(T, this_x[:,i] )
+			self.axes[0].draw_artist(trace)
 	
 			x_new = this_x[-1,i]
 			if (x_new <= self.xlim[0]) or (x_new >= self.xlim[1]):
 				self.fix_axes(this_x, 0)
 			
 
+		self.fig.canvas.blit(self.axes[0].bbox)
+
 		if args and self.probe_list:
-			this_y = np.array([ y.probe_s(*self.probe_list) for y in args[0]])
-			# print this_y
-			for i,l in enumerate(self.outs):
-				# print this_y[:,i]
-				l.set_data(T,  this_y[:,i] )
+			this_y = np.array([ np.array(y.probe_s(*self.probe_list)) for y in args[0]])
+			for i,trace in enumerate(self.outs):
+				trace.set_data(T,  this_y[:,i] )
+				self.axes[1].draw_artist(trace)
 				
 				y_new = this_y[-1,i]
 				if (y_new <= self.ylim[0]) or (y_new >= self.ylim[1]):
 					self.fix_axes(this_y, 1)
 
-		self.draw()
+			self.fig.canvas.blit(self.axes[1].bbox)
+
+		
+		if not self.drawn:
+			plt.pause(0.01)
+			self.drawn = True
+			self.start_time = time_sys.time()
+		else:
+			pass
+			
+
+	def fix_time(self, T):
+		while T[-1] > self.Tlim:
+			self.Tlim = 1.25* self.Tlim
+			for ax in self.axes:
+				ax.set_xlim(0.0, self.Tlim)
+			self.fig.canvas.draw()
+			self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.axes]
+
+			# Tmin is assumed to be non decreasing
 
 	def fix_axes(self,this_x, ax_num):
 		if ax_num == 0:
@@ -515,14 +543,14 @@ class plot_window(object):
 		lim[0] = 0.5*x_max+0.5*x_min - 1.0*(x_max-x_min)
 		lim[1] = 0.5*x_max+0.5*x_min + 1.0*(x_max-x_min)
 		self.axes[ax_num].set_ylim(lim[0],lim[1])
-
 		
-	def draw(self):
-		if self.active_draw:
-			for i in self.axes:
-				i.figure.canvas.draw()	
-			# self.fig.canvas.draw()
-		plt.pause(0.0000001)
+		self.fig.canvas.draw()
+		self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.axes]
+
+
 
 	def show(self):
+		print "Total plot time, %2.3f " % (time_sys.time()-self.start_time)
+
+		self.fig.canvas.flush_events()
 		plt.show()
