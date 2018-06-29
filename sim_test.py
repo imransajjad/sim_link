@@ -323,10 +323,10 @@ def test8():
 
 def test7():
 
-	T = np.arange(0,10.0,0.01)
+	T = np.arange(-0.0,10.0,0.01)
 
-	sys1 = (G,K,[],L,1,0)
-	x01 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
+	sys1 = (G,K,[],L,1,0,sll.int1,2)
+	x01 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[0.0])
 	M1 = sl.MDL(sys1,x01,'sys1')
 	M1.print_table()
 
@@ -346,21 +346,21 @@ def test7():
 	# M.print_table()
 
 
-	PW = sll.plot_window([0,1],[0], [1,0], plot_separate=False)
+	PW = sll.plot_window([0,2,4],[0], [1,0], plot_separate=True)
 	fig, axes = PW.return_axes()
 	axes[1].legend(['out','sys1-G'])
 	
 	x0 = np.transpose(np.matrix(M.x0))
-	y0 = M.all_out(T[0], x0, x_in)
-	print y0
+	# y0 = M.all_out(T[0], x0, x_in)
+	# print y0
 
-	print [ y0[i] for i in range(0,len(y0))]
-	dx0 = M.der(T[0], x0, x_in)
-	print dx0
+	# print [ y0[i] for i in range(0,len(y0))]
+	# dx0 = M.der(T[0], x0, x_in)
+	# print dx0
 
 	
 	T,X,Y = ode.rungekutta4ad(M.der, x_in, T, x0 , outcall=M.all_out, \
-		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate])
+		adaptive=False, realtime=False, plotcalls=[PW.animate], plottime=0.01)
 
 	PW.show()
 	

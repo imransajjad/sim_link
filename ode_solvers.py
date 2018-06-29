@@ -153,6 +153,7 @@ def rungekutta4ad(f, *args, **kwargs):
 
 	print "ode_solver with config"
 	for p in P.keys():	print p+":", P[p]
+	print ""
 
 	while t < Ttarget:
 		

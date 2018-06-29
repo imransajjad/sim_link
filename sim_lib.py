@@ -4,6 +4,8 @@
 most functions are written and tested to support numpy matrices"""
 
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg') # try if having trouble plotting on windows
 import matplotlib.pyplot as plt
 import time as time_sys
 
@@ -441,6 +443,7 @@ class plot_window(object):
 		self.states = self.axes[0].plot(*( [[]]*(2*len(cstates_i)) ))
 		self.axes[0].legend(P["xlegend"])
 		self.axes[0].set_ylabel(P["xlabel"])
+		self.state_indices = list(cstates_i)
 
 		if probe_list:
 			self.outs = self.axes[1].plot  (*( [[]]*(2*len(probe_list)) ))
@@ -454,7 +457,7 @@ class plot_window(object):
 
 
 
-		self.Tlim = 1.0
+		self.Tlim = [0.0,1.0]
 		self.xlim = [-1.0,1.0]
 		self.axes[0].set_xlim(0.0,1.0)
 		self.axes[0].set_ylim(-10.0,10.0)
@@ -489,7 +492,7 @@ class plot_window(object):
 		self.fix_time(T)
 
 
-		this_x = np.array(X)
+		this_x = np.array(X)[:,self.state_indices]
 		for i,trace in enumerate(self.states):
 			trace.set_data(T, this_x[:,i] )
 			self.axes[0].draw_artist(trace)
@@ -523,12 +526,19 @@ class plot_window(object):
 			
 
 	def fix_time(self, T):
-		while T[-1] > self.Tlim:
-			self.Tlim = 1.25* self.Tlim
-			for ax in self.axes:
-				ax.set_xlim(0.0, self.Tlim)
-			self.fig.canvas.draw()
-			self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.axes]
+		while T[-1] > self.Tlim[1]:
+			if self.Tlim[1] <= 0:
+				self.Tlim[1] += 1
+			else:
+				self.Tlim[1] = 1.5* self.Tlim[1]
+		if T[0] < self.Tlim[0]:
+			self.Tlim[0] = T[0]
+			self.Tlim[1] = T[-1]+0.5
+		for ax in self.axes:
+			ax.set_xlim(self.Tlim[0], self.Tlim[1])
+
+		self.fig.canvas.draw()
+		self.backgrounds = [self.fig.canvas.copy_from_bbox(ax.bbox) for ax in self.axes]
 
 			# Tmin is assumed to be non decreasing
 
@@ -550,7 +560,7 @@ class plot_window(object):
 
 
 	def show(self):
-		print "Total plot time, %2.3f " % (time_sys.time()-self.start_time)
+		# print "Total plot time, %2.3f " % (time_sys.time()-self.start_time)
 
 		self.fig.canvas.flush_events()
 		plt.show()

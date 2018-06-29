@@ -244,22 +244,19 @@ class MDL(object):
 		# evaluate test and remap initial conditions
 		self.init_table() # build table
 
-		# assert self.ETflag[0]
-
 		self.x0 = []
 		for row in self.ET:
 			self.x0 += x0_in[row[-1]]
 
-		
-		# self.print_table()
-		# print "x0: ", self.x0
-		# print "Done Initializing System:", namestring, "\n\n\n"
+		self.verify_table()
+		self.verify_state()
+
 
 	
 	def init_table(self):
 
 		
-		self.ETflag = [False]
+		self.ETflag = [False,False] # table_valid, states_valid
 		self.ET = []
 		self.ETvalid = [0]*len(self.ETregister)
 
@@ -269,9 +266,6 @@ class MDL(object):
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
 
-		self.table_rep_stride()
-		
-		self.verify_table()
 		self.argmap = [i for i,r in enumerate(self.ETregister) \
 						if isinstance(r,list)]
 		
@@ -326,7 +320,10 @@ class MDL(object):
 			# print exec_is
 			
 			# print "writing: ", args[N], exec_is, N, "\n"
-			self.ET.append( [args[N], exec_is, args[N].cstates, N ]  )
+			x_stride = 0
+			for row in self.ET:
+				x_stride += row[0].cstates
+			self.ET.append( [args[N], exec_is, x_stride, N ]  )
 			
 			return N
 
@@ -343,11 +340,10 @@ class MDL(object):
 			if verbose:  print N, args[N], "found else", args[N]
 			return N
 
-	def table_rep_stride(self):
-		x_stride = 0
-		for row in self.ET:
-			row[2] = x_stride
-			x_stride += row[0].cstates
+	def verify_state(self):
+		self.ETflag[1] = len(self.x0) == sum( [row[0].cstates for row in self.ET ])
+
+
 
 
 
@@ -511,7 +507,7 @@ class MDL(object):
 				for i in row[0].passargs:
 					i_string[i] += "p"
 			print "	", row[0].namestring, ", ins:" , i_string, ", stride", row[2], ", outs:", row[-1]
-		print "Table valid: ", self.ETflag[0]
+		print "Table valid:", self.ETflag[0], ", States:",self.ETflag[1]
 		self.print_register()
 		if self.ETflag[0]:
 			self.print_addinfo()
