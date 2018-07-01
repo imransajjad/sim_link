@@ -402,6 +402,36 @@ class joystick_input(object):
 		return joy_out
 
 
+class random(object):
+	"""docstring for rand"""
+	def __init__(self, randfcn, *arg):
+		# super(rand, self).__init__()
+		self.arg = arg
+		self.randfcn = randfcn
+		self.namestring = "rand"
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+	def out(self,t,x):
+		return np.matrix(self.randfcn(*self.arg))
+
+class function(object):
+	"""docstring for function"""
+	def __init__(self, function, *arg):
+		# super(function, self).__init__()
+		self.arg = arg
+		self.function = function
+		self.namestring = "function" + str(function)
+
+		self.inargs = 0
+		self.cstates = 0
+		self.passargs = []
+	def out(self,t,x):
+		return np.matrix(self.function(*self.arg))
+		
+
+
 
 
 class plot_window(object):

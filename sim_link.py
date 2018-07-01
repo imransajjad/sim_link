@@ -489,13 +489,21 @@ class MDL(object):
 		return Dx
 
 	def print_probes(self):
-		def pp(self,ind):
+		def pp(self,ind,state_ofs):
 			for i,r in enumerate(self.ETregister):
-				print "%s%d %s" % (ind, i, ( r.namestring if hasattr(r,'out')  else "" ))
+				# print self
+
+				row_n = [ row for row in self.ET if row[-1] == i]
+				if row_n: row_n = row_n[0]
+				state_str = "[%s:%s]"%(state_ofs+row_n[2],state_ofs+row_n[2]+row_n[0].cstates) \
+				if row_n and row_n[0].cstates else ""
+
+				print "%s%d %s %s" % (ind, i, ( r.namestring if hasattr(r,'out')  \
+					else "" ),  state_str)
 				if isinstance(r,MDL):
-					pp(r,"   " + ind)
-		print "Valid probe values:"
-		pp(self,"")
+					pp(r,"   " + ind, state_ofs+row_n[2] )
+		print "Valid probe values [and states]:"
+		pp(self,"",0)
 
 
 

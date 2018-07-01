@@ -195,8 +195,8 @@ def test2():
 	import matplotlib.pyplot as plt
 
 	T = np.arange(0,20.0,0.01)
-	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=3.0,omega=2),sll.step(5.0),L,1,0)
-	x0 = ([1.0, 0.6],[],[],[],[],[0.0,0.0],[],[],[])
+	sys = (G,K,sll.gain(3.7),sll.add,sll.fun_gen(A=3.0,omega=2),sll.add,sll.gain(1.0),sll.function(np.random.randn,1),sll.step(5.0),L,1,0)
+	x0 = ([1.0, 0.6],[],[],[],[],[],[],[0.0,0.0],[],[])
 
 	# sys = (sll.sub,sll.int1,sll.fun_gen(A=1.0,omega=2*np.pi*2.0,bias=1.0),sll.time)
 	# x0 = ([],[0.0],[],[],[])
@@ -207,13 +207,13 @@ def test2():
 	M.print_table()
 
 
-	PW = sll.plot_window([0,1], [6,0], [6,1] )
+	PW = sll.plot_window([0,1], [9,0], [9,1], plot_separate=False )
 	# PW2 = sll.plot_window([0], [5], [2], [0], plot_separate=False, active_draw=True)
 	fig, ax = PW.return_axes()
 	ax[1].set_xlabel("no time?")
 
 	x0 = np.transpose(np.matrix(M.x0))
-	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.out, \
+	T,X,Y = ode.rungekutta4ad(M.der, T, x0 , outcall=M.all_out, \
 		adaptive=False, min_dt=5e-3, e_tol=1e-4, realtime=True, plotcalls=[PW.animate])
 
 	PW.show()
@@ -377,4 +377,4 @@ def test7():
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test7()
+	test2()
