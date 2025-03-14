@@ -151,9 +151,9 @@ def rungekutta4ad(f, *args, **kwargs):
 	if P["outcall"]:
 		Y.append( P["outcall"](t,x, *args[0:-2]) )
 
-	print "ode_solver with config"
-	for p in P.keys():	print p+":", P[p]
-	print ""
+	print("ode_solver with config")
+	for p in P.keys():	print(p+":", P[p])
+	print("")
 
 	while t < Ttarget:
 		
@@ -266,7 +266,7 @@ def test1():
 	sigma = gamma*wn
 	s1 = np.array([-sigma + wd*1.0j])
 	s2 = np.array([-sigma - wd*1.0j])
-	print k,m,b, gamma, wd, sigma, wn
+	print(k,m,b, gamma, wd, sigma, wn)
 
 	x00 = 2
 	v00 = 0
@@ -298,7 +298,7 @@ def test2():
 	U2 = np.arange(0.1,2.51,0.05)
 	Y = 0*U2
 	for i,u2 in enumerate(U2):
-		print u2
+		print(u2)
 		_,y,_ = rungekutta4( D,  u1, u2, x, np.array([0.0]))
 		Y[i] = y[-1][0]
 

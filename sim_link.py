@@ -183,6 +183,7 @@ I don't want to use isinstance and hasattr so much
 import copy, traceback
 
 passArgModeDeep = True
+verbose = False
 # properly implementing deep passarg mode might involve splitting
 # execution tables and may be too complicated
 
@@ -228,14 +229,14 @@ class MDL(object):
 		self.namestring = namestring
 
 
-		print "Initializing System:", namestring
+		print("Initializing System: "+namestring)
 	
 		for i in sys:
 			if callable(i):
 				try:
 					i()
 				except Exception as e:
-					print "Could not initialize System:", i
+					print("Could not initialize System:", i)
 					# traceback.print_exc()
 					pass
 
@@ -262,7 +263,7 @@ class MDL(object):
 
 		# keep building table till complete
 		while not all( [i&6 for i in self.ETvalid] ):
-			# print "build table pass"
+			# print("build table pass")
 			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
 						if not T&6][0],True)
 
@@ -281,7 +282,7 @@ class MDL(object):
 		# generate exec table recursively
 		args = self.ETregister
 
-		# print "\n", self.ETvalid
+		# print("\n", self.ETvalid)
 		exec_is = []
 
 		# entries in valid table are
@@ -290,18 +291,17 @@ class MDL(object):
 		# 2 is reference to something else
 		# 4 output available
 
-		verbose = False
-		if verbose: print self.ETvalid
+		if verbose: print(self.ETvalid)
 
 		
 		if write and hasattr(args[N], 'out') and not self.ETvalid[N]&4:
 			# base element is a function, need to add to table
-			if verbose: print N, args[N], "found function"
+			if verbose: print(N, args[N], "found function")
 			
 			self.ETvalid[N] |= 4 # optimistically say output will be available
 			for i in range(0,args[N].inargs):
 				
-				# print i in args[N].passargs
+				# print(i) in args[N].passargs
 
 				# i is arg number
 				# j is next position where arg can be
@@ -310,16 +310,16 @@ class MDL(object):
 				while self.ETvalid[j]&1:
 					j += 1
 					if j == len(args):
-						print "not enough args:", N, "needs arg", j
-						print "but len(args) is", len(args)
+						print("not enough args:", N, "needs arg", j)
+						print("but len(args) is", len(args))
 				self.ETvalid[j] |= 1
 				j = self.build_table(j,i in args[N].passargs)
 				
 				exec_is.append(j)
 
-			# print exec_is
+			# print(exec_is)
 			
-			# print "writing: ", args[N], exec_is, N, "\n"
+			# print("writing: ", args[N], exec_is, N, "\n")
 			x_stride = 0
 			for row in self.ET:
 				x_stride += row[0].cstates
@@ -328,16 +328,16 @@ class MDL(object):
 			return N
 
 		elif isinstance(args[N], int):
-			if verbose: print N, args[N], "found reference to", args[N]
+			if verbose: print(N, args[N], "found reference to", args[N])
 			self.ETvalid[N] |= 2
 
 			return self.build_table(args[N],write)
 		elif isinstance(args[N], list):
 			self.ETvalid[N] |= 4
-			if verbose:  print N, args[N], "found constant", args[N]
+			if verbose:  print(N, args[N], "found constant", args[N])
 			return N
 		else:
-			if verbose:  print N, args[N], "found else", args[N]
+			if verbose:  print(N, args[N], "found else", args[N])
 			return N
 
 	def verify_state(self):
@@ -355,11 +355,11 @@ class MDL(object):
 			# find row number containing
 			for k,cur_row in enumerate(self.ET):
 				J = [ i for i,ins in enumerate(inputs) if cur_row[-1] in ins]
-				# print "J: ",J
+				# print("J: ",J)
 				if J:
 					j = J[0]
 					if j <= k:
-						print "row", j, "invalid because of row", k , "...\n"
+						print("row", j, "invalid because of row", k , "...\n")
 						raise ValueError('System Data invalid')
 						
 						
@@ -367,7 +367,7 @@ class MDL(object):
 		except Exception as e:
 			self.ETflag[0] = False
 			self.print_table()
-			print "verification failed"
+			print("verification failed")
 			traceback.print_exc()
 
 		
@@ -404,8 +404,8 @@ class MDL(object):
 		P.update(kwargs)
 
 		if not len(inputs) == self.inargs:
-			print "I ", self, " need ", self.inargs, " but received:"
-			print inputs
+			print("I ", self, " need ", self.inargs, "inarg but received:")
+			print(inputs)
 			raise AssertionError()
 		for i in range(0,self.inargs):
 			R[self.argmap[i]] = inputs[i]
@@ -421,11 +421,11 @@ class MDL(object):
 					break
 			except Exception as e:
 				# traceback.print_exc()
-				print "Error in out from this model, row:"
-				print "I,", self.namestring, ", called"
-				print row[0].namestring, row[1], row[2], row[-1]
-				print "with states", x[row[2]:row[2]+row[0].cstates]
-				print "with inputs", ins
+				print("Error in out from this model, row:")
+				print("I,", self.namestring, ", called")
+				print(row[0].namestring, row[1], row[2], row[-1])
+				print("with states", x[row[2]:row[2]+row[0].cstates])
+				print("with inputs", ins)
 				raise e
 
 		if P["out_target"] == -2:
@@ -453,8 +453,8 @@ class MDL(object):
 
 
 		# if not len(inputs) == self.inargs:
-		# 	print "I ", self, " need ", self.inargs, " but received:"
-		# 	print inputs
+		# 	print("I ", self, " need ", self.inargs, " but received:")
+		# 	print(inputs)
 		# 	raise AssertionError()
 		# for i in range(0,self.inargs):
 		# 	R[self.argmap[i]] = inputs[i]
@@ -465,8 +465,8 @@ class MDL(object):
 		# x_stride = 0
 		for row in self.ET:
 			try:
-				# print row
-				# print t,x, x_stride,x_stride+row[0].cstates, inputs
+				# print(row)
+				# print(t,x, x_stride,x_stride+row[0].cstates, inputs)
 
 				# all R's should be first output signals, dive inside till true
 				# ins = go_deep([R[i] for i in row[1]])
@@ -479,11 +479,11 @@ class MDL(object):
 						Dx[xi] = dx[xi-row[2]]
 			except Exception as e:
 				# traceback.print_exc()
-				print "Error in der from this model, row:"
-				print "I,", self.namestring, ", called"
-				print row[0].namestring, row[1], row[2], row[-1]
-				print "with states", x[row[2]:row[2]+row[0].cstates]
-				print "with inputs", ins
+				print("Error in der from this model, row:")
+				print("I,", self.namestring, ", called")
+				print(row[0].namestring, row[1], row[2], row[-1])
+				print("with states", x[row[2]:row[2]+row[0].cstates])
+				print("with inputs", ins)
 				raise e
 
 		return Dx
@@ -491,49 +491,49 @@ class MDL(object):
 	def print_probes(self):
 		def pp(self,ind,state_ofs):
 			for i,r in enumerate(self.ETregister):
-				# print self
+				# print(self)
 
 				row_n = [ row for row in self.ET if row[-1] == i]
 				if row_n: row_n = row_n[0]
 				state_str = "[%s:%s]"%(state_ofs+row_n[2],state_ofs+row_n[2]+row_n[0].cstates) \
 				if row_n and row_n[0].cstates else ""
 
-				print "%s%d %s %s" % (ind, i, ( r.namestring if hasattr(r,'out')  \
-					else "" ),  state_str)
+				print("%s%d %s %s" % (ind, i, ( r.namestring if hasattr(r,'out') \
+					else "" ),  state_str))
 				if isinstance(r,MDL):
 					pp(r,"   " + ind, state_ofs+row_n[2] )
-		print "Valid probe values [and states]:"
+		print("Valid probe values [and states]:")
 		pp(self,"",0)
 
 
 
 	def print_table(self):
-		print "--------------\nSystem Execution Table ("+self.namestring+ ")"
+		print("--------------\nSystem Execution Table ("+self.namestring+ ")")
 		for row in self.ET:
 			i_string = [ str(i_s) for i,i_s in enumerate(row[1])]
 			if not isinstance(row[0],list):
 				for i in row[0].passargs:
 					i_string[i] += "p"
-			print "	", row[0].namestring, ", ins:" , i_string, ", stride", row[2], ", outs:", row[-1]
-		print "Table valid:", self.ETflag[0], ", States:",self.ETflag[1]
+			print("	", row[0].namestring, ", ins:" , i_string, ", stride", row[2], ", outs:", row[-1])
+		print("Table valid:", self.ETflag[0], ", States:",self.ETflag[1])
 		self.print_register()
 		if self.ETflag[0]:
 			self.print_addinfo()
 			self.print_probes()
 		
-		print "\nEnd System Execution Table ("+ self.namestring +")\n--------------\n"
+		print("\nEnd System Execution Table ("+ self.namestring +")\n--------------\n")
 
 	def print_register(self):
-		print "\nSystem signal register:"
-		print "	", [R.namestring if hasattr(R,'namestring') \
-					else R for R in self.ETregister]
+		print("\nSystem signal register:")
+		print("	", [R.namestring if hasattr(R,'namestring') \
+					else R for R in self.ETregister])
 
 	def print_addinfo(self):
-		print "\nSystem I/O:"
+		print("\nSystem I/O:")
 		i_string = [str(a)+"p" if i in self.passargs else str(a) \
 						for i,a in enumerate(self.argmap)]
-		print "Inputs", i_string
-		print "Number of cstates", self.cstates, "\n"
+		print("Inputs", i_string)
+		print("Number of cstates", self.cstates, "\n")
 
 
 def go_deep(ins):
@@ -619,7 +619,7 @@ def unpack_MDL(M):
 
 		return Nreg, Nrows, OFSes
 
-	print "Unpacking System:", M.namestring
+	print("Unpacking System:", M.namestring)
 
 	Nreg, Nrows, ofses = reg_extend(M)
 
@@ -674,19 +674,19 @@ def verify(A):
 
 	if not all(nec_attr):
 		maybe_valid = False
-		print A, "does not have:"
+		print(A, "does not have:")
 		# print nec_attr
 		for name,a in zip(attr_names,nec_attr):
-			if not a: print name
+			if not a: print(name)
 
 	if nec_attr[0] and der_attr:
 		if not A.der.func_code.co_argcount == A.out.func_code.co_argcount:
 			maybe_valid = False
-			print A, "out and der don't have equal number of arguments"
+			print(A, "out and der don't have equal number of arguments")
 	if nec_attr[2] and nec_attr[3]:
 		if not len(A.passargs) <= A.inargs:
 			maybe_valid = False
-			print A, "passargs/inargs not right"
+			print(A, "passargs/inargs not right")
 	return maybe_valid
 
 

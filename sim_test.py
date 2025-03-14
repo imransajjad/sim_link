@@ -44,7 +44,7 @@ def D():
 		xdot = -x
 		return xdot
 	def out(t,x,d1,d2):
-		# print t, x, d1, d2
+		# print(t, x, d1, d2)
 		y = np.matrix([x[0,0]+d1[0,0]+d2[0,0]])
 		return y
 
@@ -73,7 +73,7 @@ def G():
 	def out(t,x,u):
 		# y = x1
 		C = np.matrix('1 0')
-		# print C,type(C),x, type(x)
+		# print(C,type(C),x, type(x))
 		y = C*x
 		return y
 
@@ -91,7 +91,7 @@ def K():
 		return np.array([])
 	
 	def out(t,x,x_ref,xhat):
-		# print x_ref[0,0], xhat
+		# print(x_ref[0,0], xhat)
 		assert len(x_ref) == 1
 		# e = np.concatenate( (np.array(x_ref),np.array([0])), axis=0)-xhat
 		e = np.matrix('1 ; 0')*x_ref-xhat
@@ -173,10 +173,10 @@ def test1():
 	T,X = ode.rungekutta4(M.der, x_ref, Trange, x0)
 	Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
 	
-	print T[-1], len(T)
-	# print Tad[-1], len(Tad)
-	print X[-1]
-	print Y[-1]
+	print(T[-1], len(T))
+	# print(Tad[-1], len(Tad)
+	print(X[-1])
+	print(Y[-1])
 	plt.figure(1)
 	plt.subplot(211)
 	plt.plot(T,[np.array(x)[:,0] for x in X])
@@ -220,9 +220,9 @@ def test2():
 	plt.plot(T)
 	plt.show()
 	
-	print T[-1]
-	print X[-1]
-	# print Y[-1]
+	print(T[-1])
+	print(X[-1])
+	# print(Y[-1])
 
 
 def test4():
@@ -260,10 +260,10 @@ def test4():
 	T,X = ode.rungekutta4ad(M.der, d_in,  T, x0)
 	Y = [ M.out(t,x,d_in) for t,x in zip(T,X) ]
 	
-	print T[-1]
-	print X[-1]
-	print Y[-1]
-	print Y[-1].probe_s([0],[2],[3])
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1])
+	print(Y[-1].probe_s([0],[2],[3]))
 	plt.plot(T,[np.array(x)[:,0] for x in X] )
 	plt.show()
 
@@ -293,9 +293,9 @@ def test0():
 
 	T,X = ode.rungekutta4ad(M.der,t,x0)
 	Y = [M.out(t,x) for t,x in zip(T,X)]
-	print T[-1]
-	print X[-1]
-	print Y[-1]
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1])
 
 
 
@@ -310,13 +310,14 @@ def test8():
 
 	M = sl.MDL(sys,x0,"this")
 	x0 = np.transpose(np.matrix(M.x0))
+	M.print_table()
 
 	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
 	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
 	
-	print T[-1]
-	print X[-1]
-	print Y[-1]
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1])
 	plt.plot(T,[np.array(x)[:,0] for x in X])
 	plt.show()
 
@@ -352,11 +353,11 @@ def test7():
 	
 	x0 = np.transpose(np.matrix(M.x0))
 	# y0 = M.all_out(T[0], x0, x_in)
-	# print y0
+	# print(y0)
 
-	# print [ y0[i] for i in range(0,len(y0))]
+	# print([ y0[i] for i in range(0,len(y0))])
 	# dx0 = M.der(T[0], x0, x_in)
-	# print dx0
+	# print(dx0)
 
 	
 	T,X,Y = ode.rungekutta4ad(M.der, x_in, T, x0 , outcall=M.all_out, \
@@ -364,9 +365,9 @@ def test7():
 
 	PW.show()
 	
-	print T[-1]
-	print X[-1]
-	print Y[-1].probe_s([0],[1,0],[1,1])
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1].probe_s([0],[1,0],[1,1]))
 
 
 
@@ -377,4 +378,4 @@ def test7():
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test2()
+	test8()

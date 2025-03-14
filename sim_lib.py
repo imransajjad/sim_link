@@ -5,7 +5,7 @@ most functions are written and tested to support numpy matrices"""
 
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg') # try if having trouble plotting on windows
+# matplotlib.use('TkAgg') # try if having trouble plotting on windows
 import matplotlib.pyplot as plt
 import time as time_sys
 
@@ -304,14 +304,14 @@ class integrator_multi(object):
 		self.namestring = "integrator_multi"
 
 	def der(self,t,x,u):
-		# print x
+		# print(x)
 		dx = np.roll(x,-1,axis=0)
 		assert len(u) == u_dim
 		dx[self.ord-1::self.ord] = u
 		return dx
 
 	def out(self,t,x,u):
-		# print x
+		# print(x)
 		return x[0::self.ord]
 		
 
@@ -347,7 +347,7 @@ class ss_LTI(object):
 
 	def der(self,t,x,u):
 		xdot = self.A*x + self.B*u
-		# print x, xdot
+		# print(x, xdot)
 		return xdot
 	def out(self,t,x,u):
 		y = self.C*x + self.D*u
@@ -457,7 +457,7 @@ class plot_window(object):
 			self.fig, (ax1,ax2) = plt.subplots(2,1)
 			self.axes = [ax1,ax2]
 		else:
-			print "here"
+			print("here")
 			self.fig, ax1 = plt.subplots(1,1)
 			self.axes = [ax1,ax1]
 			P["xlegend"] = P["xlegend"]+P["ylegend"]
