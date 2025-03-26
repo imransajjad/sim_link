@@ -183,9 +183,12 @@ I don't want to use isinstance and hasattr so much
 import copy, traceback
 
 passArgModeDeep = True
-verbose = False
+verbose = True
 # properly implementing deep passarg mode might involve splitting
 # execution tables and may be too complicated
+
+def print_debug(x):
+	if verbose: print(x)
 
 class out_list(list):
 	"""docstring for out_list"""
@@ -221,123 +224,179 @@ class out_list(list):
 		return [self.probe(*i) for i in probe_indices]
 
 
+class SignalType(object):
+	"""
+	A small helper class for entries in MDL.signals_valid
+	"""
+	UNKNOWN = 0 # (unknown)
+	INPUT = 1 # is input to some function
+	REF = 2 # is reference to something else
+	OUT = 4 # output available
 
-class MDL(object):
-	"""docstring for MDL"""
-	def __init__(self,sys,x0_in,namestring):
+	@staticmethod
+	def isvalid(value):
+		return (value & (SignalType.REF | SignalType.OUT))
+
+class MDLBase(object):
+	"""
+	MDLBase serves as the base for other model type objects
+	"""
+	def __init__(self, der, out, n_inargs, passargs, cstates, name="MDLBase"):
+		self.name = name
+
+		self.der = der # the function to calculate the derivates of the state vector
+		self.out = out # the output of the system
+
+		self.passargs = passargs # the list of passargs is required
+		self.inargs = n_inargs # number of input arguments
+		self.cstates = cstates # number of states in state vector
+	
+	def __repr__(self):
+		return f"MDL:{self.name}"
+
+class MDL(MDLBase):
+	"""
+	MDL is an MDLBase type of object that combines other MDL type objects into a system
+	"""
+	def __init__(self,sys,x0_in,name):
 		# super(MDL, self).__init__()
-		self.namestring = namestring
+		self.name = name
+		self.der = self.mdl_der
+		self.out = self.mdl_out
 
+		print(f"Initializing System: {self.name} with\n{sys}")
 
-		print("Initializing System: "+namestring)
-	
-		for i in sys:
-			if callable(i):
-				try:
-					i()
-				except Exception as e:
-					print("Could not initialize System:", i)
-					# traceback.print_exc()
-					pass
+		# these values are used to only verify correctness
+		self.table_valid = False
+		self.states_valid = False
+		self.signals_valid = [ SignalType.UNKNOWN for i in sys]
 
-		self.ETregister = out_list(sys)
+		# these value are used in execution
+		self.exec_table = [] # a table of the MDL type objects in sys only, ordered
+			# each entry is (sys, inputs_map, cstates, output_map)
+		self.exec_table_outrow = -1 # the location of the output in the exec table
+		self.signal_reg = list(sys) # a list of all the signals in the model
 
-		# evaluate test and remap initial conditions
-		self.init_table() # build table
-
-		self.x0 = []
-		for row in self.ET:
-			self.x0 += x0_in[row[-1]]
-
-		self.verify_table()
-		self.verify_state()
-
-
-	
-	def init_table(self):
-
-		
-		self.ETflag = [False,False] # table_valid, states_valid
-		self.ET = []
-		self.ETvalid = [0]*len(self.ETregister)
+		self.passargs_map = []
 
 		# keep building table till complete
-		while not all( [i&6 for i in self.ETvalid] ):
-			# print("build table pass")
-			self.build_table([i for (i,T) in enumerate(self.ETvalid) \
-						if not T&6][0],True)
+		signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
+		while not all( signals_valid ):
+			first_invalid_index = [i for (i,sig) in enumerate(signals_valid) if not sig][0]
+			print("\nbuilding from __init__")
+			self.build_table(first_invalid_index)
+			signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
 
-		self.argmap = [i for i,r in enumerate(self.ETregister) \
-						if isinstance(r,list)]
+
+		self.argmap = [i for i,r in enumerate(self.signal_reg) if isinstance(r,list)]
 		
 		self.inargs = len(self.argmap)
-		self.cstates = sum([row[0].cstates for row in self.ET ])
-		self.passargs = [i for i, p in enumerate([self.isPassArg(i) \
-						for i in self.argmap]) if p]
+		self.cstates = sum([obj.cstates for obj,_,_,_ in self.exec_table ])
+		self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
+
+		# self.x0 = []
+		# for row in self.exec_table:
+		# 	self.x0 += x0_in[row[-1]]
 		
-		return self.ETflag[0]
+		# self.verify_table()
+		# self.verify_state()
+
+	def eval_table(self, N):
+		"""
+		Version of build table that does no writes and just tells the last entry
+		that is required for computing Nth entry
+		entry
+		if sys is (G,K,diff,[],L,1,0,[]) and G.passargs = [1], then
+		eval_table(0) = 7
+		eval_table(1) = 6
+		eval_table(2) = 6
+		eval_table(3) = 3
+		eval_table(4) = 6
+		eval_table(5) = 5
+		eval_table(6) = 6
+		eval_table(7) = 7
+		"""
+		obj = self.signal_reg[N]
+		# print(f"eval table called with {N}")
 
 
-	def build_table(self,N,write):
-		# generate exec table recursively
-		args = self.ETregister
+		if isinstance(obj, MDLBase):
+			j = N
+			for i in range(0, obj.inargs):
+				j += 1
+				j = self.eval_table(j)
+			# print(f"eval table returning {N}: {j}")
+			return j
+		elif isinstance(obj, int):
+			# print(f"eval table returning {N}")
+			return N
+		elif isinstance(obj,list):
+			# print(f"eval table returning {N}")
+			return N
 
-		# print("\n", self.ETvalid)
-		exec_is = []
+	def resolve_reference(self, N):
+		obj = self.signal_reg[N]
+		if isinstance(obj, int):
+			# print(f"eval table returning {N}")
+			return obj
+		else:
+			return N
 
-		# entries in valid table are
-		# 0 (unevaluated)
-		# 1 is input to some function
-		# 2 is reference to something else
-		# 4 output available
 
-		if verbose: print(self.ETvalid)
+	def build_table(self, N):
+		"""
+		generate exec table recursively starting at the Nth signal in MDL.signal_reg
+		return the index of MDL.signal_reg that was just evaluated or in case of
+		a reference, the index of what was refered to
 
+		"""
+		obj = self.signal_reg[N]
+
+		argmap = []
+		print(f"build table {N}")
 		
-		if write and hasattr(args[N], 'out') and not self.ETvalid[N]&4:
-			# base element is a function, need to add to table
-			if verbose: print(N, args[N], "found function")
+		if isinstance(obj,MDLBase) and not SignalType.isvalid(self.signals_valid[N]):
+			# element is a function, need to add to exec_table
+			print_debug(f"found function {obj} at {N}")
+			self.signals_valid[N] |= SignalType.OUT # optimistically say output will be available
 			
-			self.ETvalid[N] |= 4 # optimistically say output will be available
-			for i in range(0,args[N].inargs):
-				
-				# print(i) in args[N].passargs
+			# then if obj has passargs, make sure where they come from is evaluated first
+			
+			out_pos = N
+			j = N
+			for i in range(0, obj.inargs):
 
 				# i is arg number
 				# j is next position where arg can be
-
-				j = N+1+i
-				while self.ETvalid[j]&1:
-					j += 1
-					if j == len(args):
-						print("not enough args:", N, "needs arg", j)
-						print("but len(args) is", len(args))
-				self.ETvalid[j] |= 1
-				j = self.build_table(j,i in args[N].passargs)
 				
-				exec_is.append(j)
+				j += 1 # start searching from here
+				argmap.append(self.resolve_reference(j))
+				if i in obj.passargs:
+					print(N,j)
+					self.build_table(j)
+					if self.exec_table_outrow < 0:
+						self.passargs_map.append(j)
+				j = self.eval_table(j)
 
-			# print(exec_is)
-			
-			# print("writing: ", args[N], exec_is, N, "\n")
-			x_stride = 0
-			for row in self.ET:
-				x_stride += row[0].cstates
-			self.ET.append( [args[N], exec_is, x_stride, N ]  )
-			
-			return N
+			if True:
+				new = (obj, argmap, obj.cstates, out_pos)
+				if out_pos == 0:
+					print_debug("\tFound mdl output")
+					self.exec_table_outrow = len(self.exec_table)
+				self.exec_table.append(new)
+			print(f"returning {j}\n")
+			return j
 
-		elif isinstance(args[N], int):
-			if verbose: print(N, args[N], "found reference to", args[N])
-			self.ETvalid[N] |= 2
-
-			return self.build_table(args[N],write)
-		elif isinstance(args[N], list):
-			self.ETvalid[N] |= 4
-			if verbose:  print(N, args[N], "found constant", args[N])
+		elif isinstance(obj, int):
+			print_debug(f"found reference to {obj} at {N}")
+			self.signals_valid[N] |= SignalType.REF
+			return self.build_table(obj)
+		elif isinstance(obj, list):
+			self.signals_valid[N] |= SignalType.OUT
+			print_debug(f"found constant {obj} at {N}")
 			return N
 		else:
-			if verbose:  print(N, args[N], "found else", args[N])
+			print_debug(f"found else {obj} at {N}")
 			return N
 
 	def verify_state(self):
@@ -391,102 +450,41 @@ class MDL(object):
 			return [ argi for row in self.ET if argi in [ row[1][i] \
 					for i in row[0].passargs ]  ]
 
-	def out(self,t,x,*inputs,**kwargs):
+	def mdl_out(self,t,x,*inputs):
+		"""
+		evaluate only till output is reached and return output
+		"""
+		y = list(self.signal_reg)
+		x_stride = 0
+		for obj, inputs_map, cstates, output in self.exec_table:
+			obj_inputs = y[inputs_map]
+			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
+			if output == 0:
+				return y[0]
+			x_stride += cstates
+		return y[0]
 
-		# P["out_target"] == n evaluate till n out in self
-		# P["out_target"] == 0 evaluate till 0 out, (default)
-		# P["out_target"] == -1 evaluate till all outs in self
-		# P["out_target"] == -2 evaluate till all outs in self and MDL rows
+	def probes(self,t,x,*inputs):
+		"""
+		evaluate everything and return an output vector
+		"""
+		y = list(self.signal_reg)
+		x_stride = 0
+		for obj, inputs_map, cstates, output in self.exec_table:
+			obj_inputs = y[inputs_map]
+			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
+			x_stride += cstates
+		return y
 
-		R = out_list(self.ETregister) # y
-
-		P = {"out_target": 0}
-		P.update(kwargs)
-
-		if not len(inputs) == self.inargs:
-			print("I ", self, " need ", self.inargs, "inarg but received:")
-			print(inputs)
-			raise AssertionError()
-		for i in range(0,self.inargs):
-			R[self.argmap[i]] = inputs[i]
-
-
-		for row in self.ET:
-			try:
-				# all R's should be first output signals, dive inside till true
-				# ins = go_deep([R[i] for i in row[1]])
-				ins = [R[i] for i in row[1]]
-				R[row[-1]] = row[0].out(t,x[row[2]:row[2]+row[0].cstates], *ins )
-				if  row[-1] == P["out_target"]:
-					break
-			except Exception as e:
-				# traceback.print_exc()
-				print("Error in out from this model, row:")
-				print("I,", self.namestring, ", called")
-				print(row[0].namestring, row[1], row[2], row[-1])
-				print("with states", x[row[2]:row[2]+row[0].cstates])
-				print("with inputs", ins)
-				raise e
-
-		if P["out_target"] == -2:
-			for row in self.ET:
-				if isinstance(row[0],MDL):
-					ins = [R[i] for i in row[1]]
-					R[row[-1]] = row[0].all_out(t,x[row[2]:row[2]+row[0].cstates], *ins )
-
-
-		return R
-
-	def reg_out(self,t,x,*inputs):
-		# called once every time der is called for self
-		# evaluates all outs in self register
-		return self.out(t,x,*inputs,out_target=-1)
-
-	def all_out(self,t,x,*inputs):
-		# more expensive but evaluates every level, call only for plotting deeper data
-		return self.out(t,x,*inputs,out_target=-2)
-
-	def der(self,t,x,*inputs):
-		R = self.reg_out(t,x,*inputs)
-		# R = out_list(self.ETregister) # y
-		# R_evaled = [False]*len(R)
-
-
-		# if not len(inputs) == self.inargs:
-		# 	print("I ", self, " need ", self.inargs, " but received:")
-		# 	print(inputs)
-		# 	raise AssertionError()
-		# for i in range(0,self.inargs):
-		# 	R[self.argmap[i]] = inputs[i]
-		# 	R_evaled[self.argmap[i]] = True
-
-		Dx = copy.copy(x)
-
-		# x_stride = 0
-		for row in self.ET:
-			try:
-				# print(row)
-				# print(t,x, x_stride,x_stride+row[0].cstates, inputs)
-
-				# all R's should be first output signals, dive inside till true
-				# ins = go_deep([R[i] for i in row[1]])
-				if row[0].cstates:
-
-					ins = [R[i] for i in row[1]]
-
-					dx = row[0].der(t,x[row[2]:row[2]+row[0].cstates], *ins )
-					for xi in range(row[2],row[2]+row[0].cstates):
-						Dx[xi] = dx[xi-row[2]]
-			except Exception as e:
-				# traceback.print_exc()
-				print("Error in der from this model, row:")
-				print("I,", self.namestring, ", called")
-				print(row[0].namestring, row[1], row[2], row[-1])
-				print("with states", x[row[2]:row[2]+row[0].cstates])
-				print("with inputs", ins)
-				raise e
-
-		return Dx
+	def mdl_der(self,t,x,*inputs):
+		signals = self.probes(t,x,*inputs)
+		dx = copy.copy(x)
+		x_stride = 0
+		for obj, inputs_map, cstates, output in self.exec_table:
+			obj_inputs = y[inputs_map]
+			dx[x_stride:x_stride+cstates] = obj.der(t, x[x_stride:x_stride+cstates], *obj_inputs)
+			x_stride += cstates
+		return dx
 
 	def print_probes(self):
 		def pp(self,ind,state_ofs):
@@ -508,20 +506,20 @@ class MDL(object):
 
 
 	def print_table(self):
-		print("--------------\nSystem Execution Table ("+self.namestring+ ")")
-		for row in self.ET:
-			i_string = [ str(i_s) for i,i_s in enumerate(row[1])]
-			if not isinstance(row[0],list):
-				for i in row[0].passargs:
+		print(f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}")
+		for obj, inputs, cstates, output in self.exec_table:
+			i_string = [ str(i_s) for i,i_s in enumerate(inputs)]
+			if not isinstance(obj,list):
+				for i in obj.passargs:
 					i_string[i] += "p"
-			print("	", row[0].namestring, ", ins:" , i_string, ", stride", row[2], ", outs:", row[-1])
-		print("Table valid:", self.ETflag[0], ", States:",self.ETflag[1])
-		self.print_register()
-		if self.ETflag[0]:
-			self.print_addinfo()
-			self.print_probes()
+			print(f"\t{obj.name}, ins:{i_string}, cstates: {cstates}, out: {output}")
+		# print("Table valid:", self.ETflag[0], ", States:",self.ETflag[1])
+		# self.print_register()
+		# if self.ETflag[0]:
+		# 	self.print_addinfo()
+		# 	self.print_probes()
 		
-		print("\nEnd System Execution Table ("+ self.namestring +")\n--------------\n")
+		print("\nEnd System Execution Table ("+ self.name +")\n--------------\n")
 
 	def print_register(self):
 		print("\nSystem signal register:")
