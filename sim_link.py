@@ -183,7 +183,7 @@ I don't want to use isinstance and hasattr so much
 import copy, traceback
 
 passArgModeDeep = True
-verbose = True
+verbose = False
 # properly implementing deep passarg mode might involve splitting
 # execution tables and may be too complicated
 
@@ -258,17 +258,15 @@ class MDL(MDLBase):
 	"""
 	MDL is an MDLBase type of object that combines other MDL type objects into a system
 	"""
-	def __init__(self,sys,x0_in,name):
+	def __init__(self,sys,name):
 		# super(MDL, self).__init__()
 		self.name = name
 		self.der = self.mdl_der
 		self.out = self.mdl_out
 
-		print(f"Initializing System: {self.name} with\n{sys}")
+		print_debug(f"Initializing System: {self.name} with\n{sys}")
 
 		# these values are used to only verify correctness
-		self.table_valid = False
-		self.states_valid = False
 		self.signals_valid = [ SignalType.UNKNOWN for i in sys]
 
 		# these value are used in execution
@@ -283,7 +281,7 @@ class MDL(MDLBase):
 		signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
 		while not all( signals_valid ):
 			first_invalid_index = [i for (i,sig) in enumerate(signals_valid) if not sig][0]
-			print("\nbuilding from __init__")
+			print_debug("\nbuilding from __init__")
 			self.build_table(first_invalid_index)
 			signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
 
@@ -293,13 +291,9 @@ class MDL(MDLBase):
 		self.inargs = len(self.argmap)
 		self.cstates = sum([obj.cstates for obj,_,_,_ in self.exec_table ])
 		self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
-
-		# self.x0 = []
-		# for row in self.exec_table:
-		# 	self.x0 += x0_in[row[-1]]
 		
-		# self.verify_table()
-		# self.verify_state()
+		self.table_valid = self.verify_table()
+
 
 	def eval_table(self, N):
 		"""
@@ -307,32 +301,21 @@ class MDL(MDLBase):
 		that is required for computing Nth entry
 		entry
 		if sys is (G,K,diff,[],L,1,0,[]) and G.passargs = [1], then
-		eval_table(0) = 7
-		eval_table(1) = 6
-		eval_table(2) = 6
-		eval_table(3) = 3
-		eval_table(4) = 6
-		eval_table(5) = 5
-		eval_table(6) = 6
-		eval_table(7) = 7
+		[eval_table(i) for i in range(0,8)] == [7,6,6,3,6,5,6,7]
 		"""
 		obj = self.signal_reg[N]
-		# print(f"eval table called with {N}")
-
 
 		if isinstance(obj, MDLBase):
 			j = N
 			for i in range(0, obj.inargs):
 				j += 1
 				j = self.eval_table(j)
-			# print(f"eval table returning {N}: {j}")
 			return j
 		elif isinstance(obj, int):
-			# print(f"eval table returning {N}")
 			return N
 		elif isinstance(obj,list):
-			# print(f"eval table returning {N}")
 			return N
+
 
 	def resolve_reference(self, N):
 		obj = self.signal_reg[N]
@@ -353,7 +336,7 @@ class MDL(MDLBase):
 		obj = self.signal_reg[N]
 
 		argmap = []
-		print(f"build table {N}")
+		print_debug(f"build table {N}")
 		
 		if isinstance(obj,MDLBase) and not SignalType.isvalid(self.signals_valid[N]):
 			# element is a function, need to add to exec_table
@@ -372,7 +355,6 @@ class MDL(MDLBase):
 				j += 1 # start searching from here
 				argmap.append(self.resolve_reference(j))
 				if i in obj.passargs:
-					print(N,j)
 					self.build_table(j)
 					if self.exec_table_outrow < 0:
 						self.passargs_map.append(j)
@@ -384,7 +366,6 @@ class MDL(MDLBase):
 					print_debug("\tFound mdl output")
 					self.exec_table_outrow = len(self.exec_table)
 				self.exec_table.append(new)
-			print(f"returning {j}\n")
 			return j
 
 		elif isinstance(obj, int):
@@ -399,56 +380,15 @@ class MDL(MDLBase):
 			print_debug(f"found else {obj} at {N}")
 			return N
 
-	def verify_state(self):
-		self.ETflag[1] = len(self.x0) == sum( [row[0].cstates for row in self.ET ])
-
-
-
-
 
 	def verify_table(self):
-		# only this function can set self.ETflag[0] to True
-		self.ETflag[0] = True
-		try:
-			inputs = [[row[1][i] for i in row[0].passargs] for row in self.ET ]
-			# find row number containing
-			for k,cur_row in enumerate(self.ET):
-				J = [ i for i,ins in enumerate(inputs) if cur_row[-1] in ins]
-				# print("J: ",J)
-				if J:
-					j = J[0]
-					if j <= k:
-						print("row", j, "invalid because of row", k , "...\n")
-						raise ValueError('System Data invalid')
-						
-						
-						
-		except Exception as e:
-			self.ETflag[0] = False
-			self.print_table()
-			print("verification failed")
-			traceback.print_exc()
+		p_inputs_table = [ ([argmap[i] for i in obj.passargs],obj) for obj, argmap, _, _ in self.exec_table ]
+		for row, (obj,_,_,output) in enumerate(self.exec_table):
+			for i, (p_input, p_input_obj) in enumerate(p_inputs_table[0:(row+1)]):
+				if output in p_input:
+					return f"Algebraic loop: output ({output}) of entry {row}:{obj} is required by entry {i}:{p_input_obj}"
+		return "Valid"
 
-		
-
-		
-
-	def isPassArg(self,argi):
-		# first find row(s)
-		if passArgModeDeep:
-			next_args = [ row[-1] for row in self.ET \
-					if argi in [ row[1][i] for i in row[0].passargs ]  ]
-			
-			# if no next arg needs argi
-			if not next_args:
-				return False
-			elif any([n==0 for n in next_args]):
-				return True
-			else:
-				return any([self.isPassArg(n) for n in next_args])
-		else:
-			return [ argi for row in self.ET if argi in [ row[1][i] \
-					for i in row[0].passargs ]  ]
 
 	def mdl_out(self,t,x,*inputs):
 		"""
@@ -513,7 +453,7 @@ class MDL(MDLBase):
 				for i in obj.passargs:
 					i_string[i] += "p"
 			print(f"\t{obj.name}, ins:{i_string}, cstates: {cstates}, out: {output}")
-		# print("Table valid:", self.ETflag[0], ", States:",self.ETflag[1])
+		print("Table valid:", self.table_valid)
 		# self.print_register()
 		# if self.ETflag[0]:
 		# 	self.print_addinfo()

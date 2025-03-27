@@ -60,7 +60,7 @@ def D():
 
 
 
-def G():
+def G_old():
 
 	def der(t,x,u):
 		# x1dot = x2dot
@@ -77,15 +77,18 @@ def G():
 		y = C*x
 		return y
 
-	G.der = der
-	G.out = out
-	G.namestring = "Plant G"
+	G_old.der = der
+	G_old.out = out
+	G_old.namestring = "Plant G"
 
-	G.cstates = 2
-	G.inargs = 1
-	G.passargs = []
+	G_old.cstates = 2
+	G_old.inargs = 2
+	G_old.passargs = [1]
 
-def K():
+G_old()
+G = sl.MDLBase(G_old.der, G_old.out, G_old.inargs, G_old.passargs, G_old.cstates, name="G_sys")
+
+def K_old():
 
 	def der(t,x,x_ref,xhat):
 		return np.array([])
@@ -102,16 +105,19 @@ def K():
 		return u
 		# return np.array([u[0,0]])
 
-	K.der = der
-	K.out = out
-	K.namestring = "Controller K"
+	K_old.der = der
+	K_old.out = out
+	K_old.namestring = "Controller K"
 
-	K.inargs = 2
-	K.cstates = 0
-	K.passargs = [0,1]
-	
+	K_old.inargs = 1
+	K_old.cstates = 0
+	K_old.passargs = [0]
 
-def L():
+K_old()
+K = sl.MDLBase(K_old.der, K_old.out, K_old.inargs, K_old.passargs, K_old.cstates, name="K_sys")
+
+
+def L_old():
 
 	def der(t,x,u,y):
 		return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0] ])
@@ -119,14 +125,19 @@ def L():
 		L = np.matrix('0.5; 1.5')
 		return 1.0*x+ 0.0*L*y
 	
-	L.der = der
-	L.out = out
-	L.namestring = "Observer L"
+	L_old.der = der
+	L_old.out = out
+	L_old.namestring = "Observer L"
 
-	L.inargs = 2
-	L.cstates = 2
-	L.passargs = [1]
+	L_old.inargs = 2
+	L_old.cstates = 2
+	L_old.passargs = [1]
 
+L_old()
+L = sl.MDLBase(L_old.der, L_old.out, L_old.inargs, L_old.passargs, L_old.cstates, name="L_sys")
+
+
+diff = sl.MDLBase(None, lambda a,b: a-b, 2, [0,1], 0, name="diff_sys")
 
 def ES():
 	#external source
@@ -304,13 +315,13 @@ def test8():
 	x_ref = [1.0]
 	
 	T = np.arange(0,10.0,0.01)
-	sys = (G,K,[],L,1,0)
+	sys_cfg = (G,K,diff,[],L,1,0,[])
 	x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
-	# sys = (G,K,[],L,0,1) # try this, it'll cause an error
+	# sys_cfg = (G,K,[],L,0,1) # try this, it'll cause an error
 
-	M = sl.MDL(sys,x0,"this")
-	x0 = np.transpose(np.matrix(M.x0))
+	M = sl.MDL(sys_cfg,"this")
 	M.print_table()
+	x0 = np.transpose(np.matrix(M.x0))
 
 	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
 	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
@@ -326,25 +337,24 @@ def test7():
 
 	T = np.arange(-0.0,10.0,0.01)
 
-	sys1 = (G,K,[],L,1,0,sll.int1,2)
+	sys1 = (G,K,sll.sub(),[],L,1,0,sll.integrator(),2)
 	x01 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[0.0])
-	M1 = sl.MDL(sys1,x01,'sys1')
+	M1 = sl.MDL(sys1,'sys1')
 	M1.print_table()
 
-	sys2 = (G,K,[],L,1,0)
+	sys2 = (G,K,sll.sub(),[],L,0,1,[])
 	x02 = ([0.0, 0.0],[],[],[0.0,0.0],[],[],[])
-	M2 = sl.MDL(sys2,x02,'sys2')
+	M2 = sl.MDL(sys2,'sys2')
 	M2.print_table()
 
 	x_in = np.matrix('8.0')
 
-	sys = (sll.gain(5.2),M1,sll.sub,[],M2,0)
-	x0 = ([],M1.x0,[],[],M2.x0,[])
-
-	M = sl.MDL(sys, x0, 'false algebraic loop')
-	M.print_table()
-	# M = sl.unpack_MDL(M)
+	# sys = (sll.gain(5.2),M1,sll.sub,[],M2,0)
+	# x0 = ([],[],[],[],[],[])
+	# M = sl.MDL(sys, 'false algebraic loop')
 	# M.print_table()
+	# # M = sl.unpack_MDL(M)
+	# # M.print_table()
 
 
 	PW = sll.plot_window([0,2,4],[0], [1,0], plot_separate=True)

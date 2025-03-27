@@ -9,55 +9,30 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time as time_sys
 
-def int1():
-	""" 1d, 1st order integrator"""
+import sim_link as sl
+
+def integrator(name="integrator"):
 	def der(t,x,u):
 		xdot = u
 		return xdot
 	def out(t,x,u):
 		y = x[0:1]
 		return y
-
-	int1.der = der
-	int1.out = out
-	int1.namestring = "int1"
-
-	int1.inargs = 1
-	int1.cstates = 1
-	int1.passargs = []
+	return sl.MDLBase(der, out, 1, [], 1, name=name)
 
 
-def add():
+def add(name="add"):
 	""" add two signals out=a+b """
-	# def der(t,x,a,b):
-	# 	return x[0:0]
 	def out(t,x,a,b):
 		return a+b
-
-	# add.der = der
-	add.out = out
-	add.namestring = "add"
-
-	add.inargs = 2
-	add.cstates = 0
-	add.passargs = [0,1]
+	return sl.MDLBase(None, out, 2, [0,1], 0, name=name)
 
 
-def sub():
-	""" subtract two signals out=a+b """
-	# def der(t,x,a,b):
-	# 	xdot = x[0:0]
-	# 	return xdot
+def sub(name="sub"):
+	""" add two signals out=a+b """
 	def out(t,x,a,b):
 		return a-b
-
-	# sub.der = der
-	sub.out = out
-	sub.namestring = "sub"
-
-	sub.inargs = 2
-	sub.cstates = 0
-	sub.passargs = [0,1]
+	return sl.MDLBase(None, out, 2, [0,1], 0, name=name)
 
 
 def mul():
