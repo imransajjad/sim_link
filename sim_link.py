@@ -20,12 +20,12 @@ MDL-like objects, for example:
 ---
 
 def der(t,x,u,y):
-	# x1dot = x2dot
-	# x2dot = -1.0*x1 -2.0*x2 + u
-	return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0] ])
+    # x1dot = x2dot
+    # x2dot = -1.0*x1 -2.0*x2 + u
+    return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0] ])
 def out(t,x,u,y):
-	# xhat = x + L*y
-	return 0.5*np.array(x)+ np.array([0.5, 1.5])*np.array(y)
+    # xhat = x + L*y
+    return 0.5*np.array(x)+ np.array([0.5, 1.5])*np.array(y)
 
 L = sl.MDLBase(der, out, 2, [1], [0.0, 0.0], name="Observer L")
 # 2 is number of inputs (u and y)
@@ -42,7 +42,7 @@ When providing a tuple to the system think of it as unpacking an expression:
 
 G(K(x_ref,L(K(...),G(...))))  => (G,K,[],L,1,0)
 
-Note: There is no guarantee that an arbitrary 
+Note: There is no guarantee that an arbitrary
 expression like the one on the right will work, but I've tried my best
 to make the ones on the left work for all cases
 
@@ -75,40 +75,40 @@ import sim_link as sl
 
 
 def test8():
-	import matplotlib.pyplot as plt
-	x_ref = [1.0]
-	
-	T = np.arange(0,10.0,0.01)
-	sys = (G,K,[],L,1,0)
-	x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
-	# sys = (G,K,[],L,0,1) # try this, it'll cause an error
+    import matplotlib.pyplot as plt
+    x_ref = [1.0]
 
-	M = sl.MDL(sys,x0,"this")
-	x0 = np.transpose(np.matrix(M.x0))
+    T = np.arange(0,10.0,0.01)
+    sys = (G,K,[],L,1,0)
+    x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
+    # sys = (G,K,[],L,0,1) # try this, it'll cause an error
 
-	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
-	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
-	
-	print T[-1]
-	print X[-1]
-	print Y[-1]
-	plt.plot(T,[np.array(x)[:,0] for x in X])
-	plt.show()
+    M = sl.MDL(sys,x0,"this")
+    x0 = np.transpose(np.matrix(M.x0))
+
+    T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
+    Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
+
+    print T[-1]
+    print X[-1]
+    print Y[-1]
+    plt.plot(T,[np.array(x)[:,0] for x in X])
+    plt.show()
 
 ---
 
 Basic ideas:
 1. t,x are global (in a sense)
     so construct a der(t,x,*args) and out(t,x,*args) by connecting individual
-    functions, and 'extract' hidden states from subsystems into the global 
+    functions, and 'extract' hidden states from subsystems into the global
     state vector
 
 2. evaluation order has to be correct for out
     no algebraic loops are allowed,
     so MDL builds an execution table which der and out then use
-    order of der execution doesn't really matter as long as out has been 
+    order of der execution doesn't really matter as long as out has been
     evaluated
-    passargs are necessary to eliminate false positives in algebraic 
+    passargs are necessary to eliminate false positives in algebraic
     loops
 
 3. This is kind of like a Moore State machine
@@ -118,7 +118,7 @@ Basic ideas:
 4. Need so solve the differential equation formed by der and out:
     xdot = der(t,x,*args)
     y = out(t,x,*args)
-    You can use someone else's solver, write your own, or use the ode_solvers 
+    You can use someone else's solver, write your own, or use the ode_solvers
     module
 
 5. The MDL function is also similar to G, L etc
@@ -130,37 +130,37 @@ Basic ideas:
 
 6. Multiple instances of the same function (block) are allowed:
     Since the state is not stored inside the functions themselves, 'two or more'
-    of the same system will act as two separate systems and their states and 
+    of the same system will act as two separate systems and their states and
     results will be stored separately, for example if A(s) = 1/s
         A(A(in)) => (A,A,[in]) => 1/s^2
     If you want to use the result of a function twice, use references (ints)
 
 7. Since MDL objects also act as dynamical system functions
-	They can also be connected together
-	sys_1 = (G,K,[],L,1,0)
-	M1,x0_1 = sl.init_MDL(sys_1, x0_1, "Model KGL1")
-	
-	sys_2 = (G,K,[],L,1,0)
-	M2,x0_2 = sl.init_MDL(sys_2, x0_2, "Model KGL2")
+    They can also be connected together
+    sys_1 = (G,K,[],L,1,0)
+    M1,x0_1 = sl.init_MDL(sys_1, x0_1, "Model KGL1")
 
-	sys_12 = (D,M1,M2,D,ES,[],[])
-	M,x0 = sl.init_MDL(sys_12 ,x0_12, "Model KGL1+KGL2-G")
+    sys_2 = (G,K,[],L,1,0)
+    M2,x0_2 = sl.init_MDL(sys_2, x0_2, "Model KGL2")
 
-	is a valid operation
+    sys_12 = (D,M1,M2,D,ES,[],[])
+    M,x0 = sl.init_MDL(sys_12 ,x0_12, "Model KGL1+KGL2-G")
+
+    is a valid operation
 
 8. MDL objects can be unpacked
-	If a MDL object has references to execute other MDL objects, the 
-	unpack_MDL() method will replace the row containing an MDL object
-	with that MDL object's rows. This might be useful, but is not recommended
-	because while the execution order and state vector order are maintained,
-	the output vector order is not guaranteed to be the same.
-	I have assumed that the original order cannot be extracted from a 'packed'
-	system, but I may be wrong.
+    If a MDL object has references to execute other MDL objects, the
+    unpack_MDL() method will replace the row containing an MDL object
+    with that MDL object's rows. This might be useful, but is not recommended
+    because while the execution order and state vector order are maintained,
+    the output vector order is not guaranteed to be the same.
+    I have assumed that the original order cannot be extracted from a 'packed'
+    system, but I may be wrong.
 
 9. External Inputs are also allowed
-	Simply define a function with no states or inputs, but as an output, you
-	can make any type of system calls you want. The ode solvers will have to
-	be run in realtime for this.
+    Simply define a function with no states or inputs, but as an output, you
+    can make any type of system calls you want. The ode solvers will have to
+    be run in realtime for this.
 
 
 
@@ -179,518 +179,527 @@ verbose = False
 # properly implementing deep passarg mode might involve splitting
 # execution tables and may be too complicated
 
+
 def print_debug(x):
-	if verbose: print(x)
+    if verbose:
+        print(x)
+
 
 class out_list(list):
-	"""docstring for out_list"""
-	def getitemnormally(self,index):
-		return super(out_list,self).__getitem__(index)
-	def getfirstitem(self, index):
-		R = self.getitemnormally(index)
-		if isinstance(R,out_list):
-			R = R.getfirstitem(0)
-		return R
+    """docstring for out_list"""
 
-	def __getitem__(self, index):
-		return self.getfirstitem(index)
-	def probe(self, *indices):
-		# use this recursive function with caution
-		# usually the deepest extracted element is assumed to be a scalar
-		# in case there are elements left in index and the current deepest
-		# element is not a scalar, new_item[indices[1:]] is called which is
-		# equivalent to new_item[2,3,1,...].
-		# so new_item should either have a scalar or a __getitem__ method
-		# that accepts tuples
+    def getitemnormally(self, index):
+        return super(out_list, self).__getitem__(index)
 
-		if len(indices) > 1:
-			new_item = self.getitemnormally(indices[0])
-			if isinstance(new_item,out_list):
-				return new_item.probe(*indices[1:])
-			else:
-				return new_item[indices[1:]]
-		else:
-			return self.getfirstitem(indices[0])
+    def getfirstitem(self, index):
+        R = self.getitemnormally(index)
+        if isinstance(R, out_list):
+            R = R.getfirstitem(0)
+        return R
 
-	def probe_s(self, *probe_indices):
-		return [self.probe(*i) for i in probe_indices]
+    def __getitem__(self, index):
+        return self.getfirstitem(index)
+
+    def probe(self, *indices):
+        # use this recursive function with caution
+        # usually the deepest extracted element is assumed to be a scalar
+        # in case there are elements left in index and the current deepest
+        # element is not a scalar, new_item[indices[1:]] is called which is
+        # equivalent to new_item[2,3,1,...].
+        # so new_item should either have a scalar or a __getitem__ method
+        # that accepts tuples
+
+        if len(indices) > 1:
+            new_item = self.getitemnormally(indices[0])
+            if isinstance(new_item, out_list):
+                return new_item.probe(*indices[1:])
+            else:
+                return new_item[indices[1:]]
+        else:
+            return self.getfirstitem(indices[0])
+
+    def probe_s(self, *probe_indices):
+        return [self.probe(*i) for i in probe_indices]
 
 
 class SignalType(object):
-	"""
-	A small helper class for entries in MDL.signals_valid
-	"""
-	UNKNOWN = 0 # (unknown)
-	INPUT = 1 # is input to some function
-	REF = 2 # is reference to something else
-	OUT = 4 # output available
+    """
+    A small helper class for entries in MDL.signals_valid
+    """
 
-	@staticmethod
-	def isvalid(value):
-		return (value & (SignalType.REF | SignalType.OUT))
+    UNKNOWN = 0  # (unknown)
+    INPUT = 1  # is input to some function
+    REF = 2  # is reference to something else
+    OUT = 4  # output available
+
+    @staticmethod
+    def isvalid(value):
+        return value & (SignalType.REF | SignalType.OUT)
+
 
 class MDLBase(object):
-	"""
-	MDLBase serves as the base for other model type objects
-	"""
-	def __init__(self, der, out, n_inargs, passargs, x0, name="MDLBase"):
-		self.name = name
+    """
+    MDLBase serves as the base for other model type objects
+    """
 
-		self.der = der # the function to calculate the derivates of the state vector
-		self.out = out # the output of the system
+    def __init__(self, der, out, n_inargs, passargs, x0, name="MDLBase"):
+        self.name = name
 
-		self.passargs = passargs # the list of passargs is required
-		self.inargs = n_inargs # number of input arguments
-		self.x0 = x0 # the initial state vector
-		self.cstates = len(x0) # number of states in state vector
-	
-	def get_x0(self):
-		return self.x0
-	
-	def __repr__(self):
-		return f"MDL:{self.name}"
+        self.der = der  # the function to calculate the derivates of the state vector
+        self.out = out  # the output of the system
+
+        self.passargs = passargs  # the list of passargs is required
+        self.inargs = n_inargs  # number of input arguments
+        self.x0 = x0  # the initial state vector
+        self.cstates = len(x0)  # number of states in state vector
+
+    def get_x0(self):
+        return self.x0
+
+    def __repr__(self):
+        return f"MDL:{self.name}"
+
 
 class MDL(MDLBase):
-	"""
-	MDL is an MDLBase type of object that combines other MDL type objects into a system
-	"""
-	def __init__(self,sys,name):
-		# super(MDL, self).__init__()
-		self.name = name
-		self.der = self.mdl_der
-		self.out = self.mdl_out
+    """
+    MDL is an MDLBase type of object that combines other MDL type objects into a system
+    """
 
-		print_debug(f"Initializing System: {self.name} with\n{sys}")
+    def __init__(self, sys, name):
+        # super(MDL, self).__init__()
+        self.name = name
+        self.der = self.mdl_der
+        self.out = self.mdl_out
 
-		# these values are used to only verify correctness
-		self.signals_valid = [ SignalType.UNKNOWN for i in sys]
+        print_debug(f"Initializing System: {self.name} with\n{sys}")
 
-		# these value are used in execution
-		self.exec_table = [] # a table of the MDL type objects in sys only, ordered
-			# each entry is (sys, inputs_map, cstates, output_map)
-		self.exec_table_outrow = -1 # the location of the output in the exec table
-		self.signal_reg = list(sys) # a list of all the signals in the model
+        # these values are used to only verify correctness
+        self.signals_valid = [SignalType.UNKNOWN for i in sys]
 
-		self.passargs_map = []
+        # these value are used in execution
+        self.exec_table = []  # a table of the MDL type objects in sys only, ordered
+        # each entry is (sys, inputs_map, cstates, output_map)
+        self.exec_table_outrow = -1  # the location of the output in the exec table
+        self.signal_reg = list(sys)  # a list of all the signals in the model
 
-		# keep building table till complete
-		signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
-		while not all( signals_valid ):
-			first_invalid_index = [i for (i,sig) in enumerate(signals_valid) if not sig][0]
-			print_debug("\nbuilding from __init__")
-			self.build_table(first_invalid_index)
-			signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
+        self.passargs_map = []
 
+        # keep building table till complete
+        signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
+        while not all(signals_valid):
+            first_invalid_index = [i for (i, sig) in enumerate(signals_valid) if not sig][0]
+            print_debug("\nbuilding from __init__")
+            self.build_table(first_invalid_index)
+            signals_valid = [SignalType.isvalid(i) for i in self.signals_valid]
 
-		self.argmap = [i for i,r in enumerate(self.signal_reg) if isinstance(r,list)]
-		
-		self.inargs = len(self.argmap)
-		self.cstates = sum([obj.cstates for obj,_,_,_ in self.exec_table ])
-		self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
-		
-		self.table_valid = self.verify_table()
+        self.argmap = [i for i, r in enumerate(self.signal_reg) if isinstance(r, list)]
 
+        self.inargs = len(self.argmap)
+        self.cstates = sum([obj.cstates for obj, _, _, _ in self.exec_table])
+        self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
 
-	def eval_table(self, N):
-		"""
-		Version of build table that does no writes and just tells the last entry
-		that is required for computing Nth entry
-		entry
-		if sys is (G,K,diff,[],L,1,0,[]) and G.passargs = [1], then
-		[eval_table(i) for i in range(0,8)] == [7,6,6,3,6,5,6,7]
-		"""
-		obj = self.signal_reg[N]
+        self.table_valid = self.verify_table()
 
-		if isinstance(obj, MDLBase):
-			j = N
-			for i in range(0, obj.inargs):
-				j += 1
-				j = self.eval_table(j)
-			return j
-		elif isinstance(obj, int):
-			return N
-		elif isinstance(obj,list):
-			return N
+    def eval_table(self, N):
+        """
+        Version of build table that does no writes and just tells the last entry
+        that is required for computing Nth entry
+        entry
+        if sys is (G,K,diff,[],L,1,0,[]) and G.passargs = [1], then
+        [eval_table(i) for i in range(0,8)] == [7,6,6,3,6,5,6,7]
+        """
+        obj = self.signal_reg[N]
 
+        if isinstance(obj, MDLBase):
+            j = N
+            for i in range(0, obj.inargs):
+                j += 1
+                j = self.eval_table(j)
+            return j
+        elif isinstance(obj, int):
+            return N
+        elif isinstance(obj, list):
+            return N
 
-	def resolve_reference(self, N):
-		obj = self.signal_reg[N]
-		if isinstance(obj, int):
-			# print(f"eval table returning {N}")
-			return obj
-		else:
-			return N
+    def resolve_reference(self, N):
+        obj = self.signal_reg[N]
+        if isinstance(obj, int):
+            # print(f"eval table returning {N}")
+            return obj
+        else:
+            return N
 
+    def build_table(self, N):
+        """
+        generate exec table recursively starting at the Nth signal in MDL.signal_reg
+        return the index of MDL.signal_reg that was just evaluated or in case of
+        a reference, the index of what was refered to
 
-	def build_table(self, N):
-		"""
-		generate exec table recursively starting at the Nth signal in MDL.signal_reg
-		return the index of MDL.signal_reg that was just evaluated or in case of
-		a reference, the index of what was refered to
+        """
+        obj = self.signal_reg[N]
 
-		"""
-		obj = self.signal_reg[N]
+        argmap = []
+        print_debug(f"build table {N}")
 
-		argmap = []
-		print_debug(f"build table {N}")
-		
-		if isinstance(obj,MDLBase) and not SignalType.isvalid(self.signals_valid[N]):
-			# element is a function, need to add to exec_table
-			print_debug(f"found function {obj} at {N}")
-			self.signals_valid[N] |= SignalType.OUT # optimistically say output will be available
-			
-			# then if obj has passargs, make sure where they come from is evaluated first
-			
-			out_pos = N
-			j = N
-			for i in range(0, obj.inargs):
+        if isinstance(obj, MDLBase) and not SignalType.isvalid(self.signals_valid[N]):
+            # element is a function, need to add to exec_table
+            print_debug(f"found function {obj} at {N}")
+            self.signals_valid[N] |= SignalType.OUT  # optimistically say output will be available
 
-				# i is arg number
-				# j is next position where arg can be
-				
-				j += 1 # start searching from here
-				argmap.append(self.resolve_reference(j))
-				if i in obj.passargs:
-					self.build_table(j)
-					if self.exec_table_outrow < 0:
-						self.passargs_map.append(j)
-				j = self.eval_table(j)
+            # then if obj has passargs, make sure where they come from is evaluated first
 
-			if True:
-				new = (obj, argmap, obj.cstates, out_pos)
-				if out_pos == 0:
-					print_debug("\tFound mdl output")
-					self.exec_table_outrow = len(self.exec_table)
-				self.exec_table.append(new)
-			return j
+            out_pos = N
+            j = N
+            for i in range(0, obj.inargs):
 
-		elif isinstance(obj, int):
-			print_debug(f"found reference to {obj} at {N}")
-			self.signals_valid[N] |= SignalType.REF
-			return self.build_table(obj)
-		elif isinstance(obj, list):
-			self.signals_valid[N] |= SignalType.OUT
-			print_debug(f"found constant {obj} at {N}")
-			return N
-		else:
-			print_debug(f"found else {obj} at {N}")
-			return N
+                # i is arg number
+                # j is next position where arg can be
 
+                j += 1  # start searching from here
+                argmap.append(self.resolve_reference(j))
+                if i in obj.passargs:
+                    self.build_table(j)
+                    if self.exec_table_outrow < 0:
+                        self.passargs_map.append(j)
+                j = self.eval_table(j)
 
-	def verify_table(self):
-		p_inputs_table = [ ([argmap[i] for i in obj.passargs],obj) for obj, argmap, _, _ in self.exec_table ]
-		for row, (obj,_,_,output) in enumerate(self.exec_table):
-			for i, (p_input, p_input_obj) in enumerate(p_inputs_table[0:(row+1)]):
-				if output in p_input:
-					return f"Algebraic loop: output ({output}) of entry {row}:{obj} is required by entry {i}:{p_input_obj}"
-		return "Valid"
+            if True:
+                new = (obj, argmap, obj.cstates, out_pos)
+                if out_pos == 0:
+                    print_debug("\tFound mdl output")
+                    self.exec_table_outrow = len(self.exec_table)
+                self.exec_table.append(new)
+            return j
 
+        elif isinstance(obj, int):
+            print_debug(f"found reference to {obj} at {N}")
+            self.signals_valid[N] |= SignalType.REF
+            return self.build_table(obj)
+        elif isinstance(obj, list):
+            self.signals_valid[N] |= SignalType.OUT
+            print_debug(f"found constant {obj} at {N}")
+            return N
+        else:
+            print_debug(f"found else {obj} at {N}")
+            return N
 
-	def get_x0(self):
-		sys_list = filter(lambda e: isinstance(e,MDLBase), self.signal_reg)
-		x0 = [x for s in sys_list for x in s.get_x0()]
-		return x0
+    def verify_table(self):
+        p_inputs_table = [([argmap[i] for i in obj.passargs], obj) for obj, argmap, _, _ in self.exec_table]
+        for row, (obj, _, _, output) in enumerate(self.exec_table):
+            for i, (p_input, p_input_obj) in enumerate(p_inputs_table[0 : (row + 1)]):
+                if output in p_input:
+                    return f"Algebraic loop: output ({output}) of entry {row}:{obj} is required by entry {i}:{p_input_obj}"
+        return "Valid"
 
-	# def flatten_state(self, x):
-	# 	x_flat = 
-	# 	return x_flat
+    def get_x0(self):
+        sys_list = filter(lambda e: isinstance(e, MDLBase), self.signal_reg)
+        x0 = [x for s in sys_list for x in s.get_x0()]
+        return x0
 
-	# def unflatten_state(self, x_flat):
-	# 	x = 
-	# 	return x
+    # def flatten_state(self, x):
+    # 	x_flat =
+    # 	return x_flat
 
-	def mdl_out(self,t,x,*inputs):
-		"""
-		evaluate only till output is reached and return output
-		"""
-		y = list(self.signal_reg)
-		for i,arg_pos in enumerate(self.argmap):
-			y[arg_pos] = inputs[i]
-		x_stride = 0
-		for obj, inputs_map, cstates, output in self.exec_table:
-			obj_inputs = [y[i] for i in inputs_map]
-			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
-			if output == 0:
-				return y[0]
-			x_stride += cstates
-		return y[0]
+    # def unflatten_state(self, x_flat):
+    # 	x =
+    # 	return x
 
-	def probes(self,t,x,*inputs):
-		"""
-		evaluate everything and return an output vector
-		"""
-		y = list(self.signal_reg)
-		for i,arg_pos in enumerate(self.argmap):
-			y[arg_pos] = inputs[i]
-		x_stride = 0
-		for obj, inputs_map, cstates, output in self.exec_table:
-			obj_inputs = [y[i] for i in inputs_map]
-			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
-			x_stride += cstates
-		return y
+    def mdl_out(self, t, x, *inputs):
+        """
+        evaluate only till output is reached and return output
+        """
+        y = list(self.signal_reg)
+        for i, arg_pos in enumerate(self.argmap):
+            y[arg_pos] = inputs[i]
+        x_stride = 0
+        for obj, inputs_map, cstates, output in self.exec_table:
+            obj_inputs = [y[i] for i in inputs_map]
+            y[output] = obj.out(t, x[x_stride : x_stride + cstates], *obj_inputs)
+            if output == 0:
+                return y[0]
+            x_stride += cstates
+        return y[0]
 
-	def mdl_der(self,t,x,*inputs):
-		y = self.probes(t,x,*inputs)
-		dx = copy.copy(x)
-		x_stride = 0
-		for obj, inputs_map, cstates, output in self.exec_table:
-			if not obj.der and obj.cstates == 0:
-				continue
-			obj_inputs = [y[i] for i in inputs_map]
-			dx[x_stride:x_stride+cstates] = obj.der(t, x[x_stride:x_stride+cstates], *obj_inputs)
-			x_stride += cstates
-		return dx
+    def probes(self, t, x, *inputs):
+        """
+        evaluate everything and return an output vector
+        """
+        y = list(self.signal_reg)
+        for i, arg_pos in enumerate(self.argmap):
+            y[arg_pos] = inputs[i]
+        x_stride = 0
+        for obj, inputs_map, cstates, output in self.exec_table:
+            obj_inputs = [y[i] for i in inputs_map]
+            y[output] = obj.out(t, x[x_stride : x_stride + cstates], *obj_inputs)
+            x_stride += cstates
+        return y
 
-	def print_probes(self):
-		def pp(self,ind,state_ofs):
-			for i,r in enumerate(self.ETregister):
-				# print(self)
+    def mdl_der(self, t, x, *inputs):
+        y = self.probes(t, x, *inputs)
+        dx = copy.copy(x)
+        x_stride = 0
+        for obj, inputs_map, cstates, output in self.exec_table:
+            if not obj.der and obj.cstates == 0:
+                continue
+            obj_inputs = [y[i] for i in inputs_map]
+            dx[x_stride : x_stride + cstates] = obj.der(t, x[x_stride : x_stride + cstates], *obj_inputs)
+            x_stride += cstates
+        return dx
 
-				row_n = [ row for row in self.ET if row[-1] == i]
-				if row_n: row_n = row_n[0]
-				state_str = "[%s:%s]"%(state_ofs+row_n[2],state_ofs+row_n[2]+row_n[0].cstates) \
-				if row_n and row_n[0].cstates else ""
+    def print_probes(self):
+        def pp(self, ind, state_ofs):
+            for i, r in enumerate(self.ETregister):
+                # print(self)
 
-				print("%s%d %s %s" % (ind, i, ( r.namestring if hasattr(r,'out') \
-					else "" ),  state_str))
-				if isinstance(r,MDL):
-					pp(r,"   " + ind, state_ofs+row_n[2] )
-		print("Valid probe values [and states]:")
-		pp(self,"",0)
+                row_n = [row for row in self.ET if row[-1] == i]
+                if row_n:
+                    row_n = row_n[0]
+                state_str = (
+                    "[%s:%s]" % (state_ofs + row_n[2], state_ofs + row_n[2] + row_n[0].cstates)
+                    if row_n and row_n[0].cstates
+                    else ""
+                )
 
-	def table(self):
-		string = ""
-		string += f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}\n"
-		for obj, inputs, cstates, output in self.exec_table:
-			i_list = [ f"{inp}" + ("p" if i in obj.passargs else "") for i,inp in enumerate(inputs)]
-			string += f"\t{obj.name}, ins:[{', '.join(i_list)}], cstates: {cstates}, out: {output}\n"
-		string += f"Table valid: {self.table_valid}\n"
-		string += "End System Execution Table ("+ self.name +")\n--------------"
-		return string
+                print("%s%d %s %s" % (ind, i, (r.namestring if hasattr(r, "out") else ""), state_str))
+                if isinstance(r, MDL):
+                    pp(r, "   " + ind, state_ofs + row_n[2])
 
-	def print_register(self):
-		print("\nSystem signal register:")
-		print("	", [R.namestring if hasattr(R,'namestring') \
-					else R for R in self.ETregister])
+        print("Valid probe values [and states]:")
+        pp(self, "", 0)
 
-	def print_addinfo(self):
-		print("\nSystem I/O:")
-		i_string = [str(a)+"p" if i in self.passargs else str(a) \
-						for i,a in enumerate(self.argmap)]
-		print("Inputs", i_string)
-		print("Number of cstates", self.cstates, "\n")
+    def table(self):
+        string = ""
+        string += f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}\n"
+        for obj, inputs, cstates, output in self.exec_table:
+            i_list = [f"{inp}" + ("p" if i in obj.passargs else "") for i, inp in enumerate(inputs)]
+            string += f"\t{obj.name}, ins:[{', '.join(i_list)}], cstates: {cstates}, out: {output}\n"
+        string += f"Table valid: {self.table_valid}\n"
+        string += "End System Execution Table (" + self.name + ")\n--------------"
+        return string
+
+    def print_register(self):
+        print("\nSystem signal register:")
+        print("	", [R.namestring if hasattr(R, "namestring") else R for R in self.ETregister])
+
+    def print_addinfo(self):
+        print("\nSystem I/O:")
+        i_string = [str(a) + "p" if i in self.passargs else str(a) for i, a in enumerate(self.argmap)]
+        print("Inputs", i_string)
+        print("Number of cstates", self.cstates, "\n")
 
 
 def go_deep(ins):
-	for i,r in enumerate(ins):
-		if not isinstance(ins[i],int) and not hasattr(ins[i],'out'):
-			while isinstance(ins[i],out_list):
-				# print ins[i], ins[i][0]
-				ins[i] = ins[i][0]
-	return ins
+    for i, r in enumerate(ins):
+        if not isinstance(ins[i], int) and not hasattr(ins[i], "out"):
+            while isinstance(ins[i], out_list):
+                # print ins[i], ins[i][0]
+                ins[i] = ins[i][0]
+    return ins
 
 
 def unpack_MDL(M):
-	# if a model consists of submodels, this will 'unpack' it's execution table
-	# until it only contains functions
-	# does (should) not affect execution order or state variables
+    # if a model consists of submodels, this will 'unpack' it's execution table
+    # until it only contains functions
+    # does (should) not affect execution order or state variables
 
-	def offset_row(sub_row,ofs):
-		return [sub_row[0],[i+ofs for i in sub_row[1]], sub_row[-1]+ofs]
+    def offset_row(sub_row, ofs):
+        return [sub_row[0], [i + ofs for i in sub_row[1]], sub_row[-1] + ofs]
 
-	def find_replace_inrow(sub_row,a,b):
-		# replace a with b in row
-		return [sub_row[0],[b if i==a else i for i in sub_row[1]], b \
-						if sub_row[-1]==a else sub_row[-1]]
+    def find_replace_inrow(sub_row, a, b):
+        # replace a with b in row
+        return [sub_row[0], [b if i == a else i for i in sub_row[1]], b if sub_row[-1] == a else sub_row[-1]]
 
+    def reg_extend(M):
+        Nreg = []
+        Nreg += M.ETregister
+        Nrows = list(M.ET)
+        OFSes = []
+        i = 0
+        while i < len(Nreg):
+            if isinstance(Nreg[i], MDL):
 
-	def reg_extend(M):
-		Nreg = []
-		Nreg += M.ETregister
-		Nrows = list(M.ET)
-		OFSes = []
-		i = 0
-		while i < len(Nreg):
-			if isinstance(Nreg[i],MDL):
+                # print "\n\n\n"
+                # print i
+                # print Nreg
+                # print "\n"
+                # for row in Nrows:
+                # 	print row
 
-				# print "\n\n\n"
-				# print i
-				# print Nreg
-				# print "\n"
-				# for row in Nrows:
-				# 	print row
+                # find index of matching row in ET
+                m = [j for j, row in enumerate(Nrows) if row[-1] == i][0]
 
-				# find index of matching row in ET
-				m = [ j for j,row in enumerate(Nrows) if row[-1]==i][0] 
+                # print m
 
-				# print m
-				
-				sub_argmap = Nreg[i].argmap
-				sub_reg = Nreg[i].ETregister
-				# done extracting some data from subsystem
+                sub_argmap = Nreg[i].argmap
+                sub_reg = Nreg[i].ETregister
+                # done extracting some data from subsystem
 
-				ofs = len(Nreg)-1
+                ofs = len(Nreg) - 1
 
-				OFSes.append( [i,ofs,Nreg[i].inargs,Nreg[i].argmap] )
+                OFSes.append([i, ofs, Nreg[i].inargs, Nreg[i].argmap])
 
-				# start building replacement and additions to Nreg
-				Nreg[i] = sub_reg[0]
-				
-				add_reg = [j+ofs if isinstance(j,int) else j for j in sub_reg[1:]]
-				add_reg = [i if j==ofs else j for j in add_reg]
-				
-				arg_locs = [j for j,a in enumerate(add_reg) if isinstance(a,list)]
+                # start building replacement and additions to Nreg
+                Nreg[i] = sub_reg[0]
 
-				assert len( arg_locs ) == len( sub_argmap )
+                add_reg = [j + ofs if isinstance(j, int) else j for j in sub_reg[1:]]
+                add_reg = [i if j == ofs else j for j in add_reg]
 
+                arg_locs = [j for j, a in enumerate(add_reg) if isinstance(a, list)]
 
+                assert len(arg_locs) == len(sub_argmap)
 
-				# print "\n"
-				# print Nreg
+                # print "\n"
+                # print Nreg
 
-				# then replace rows in ET
-				add_rows = [offset_row(row,ofs) for row in Nrows[m][0].ET]
+                # then replace rows in ET
+                add_rows = [offset_row(row, ofs) for row in Nrows[m][0].ET]
 
-				# replace output
-				add_rows = [find_replace_inrow(row,ofs,i) for row in add_rows]
-				# replace inputs
-				for ins, sub_ins, reg_argi in zip( Nrows[m][1], sub_argmap, arg_locs ):
-					add_reg[reg_argi] = ins
-					add_rows = [find_replace_inrow(row,sub_ins+ofs,ins) for row in add_rows]
+                # replace output
+                add_rows = [find_replace_inrow(row, ofs, i) for row in add_rows]
+                # replace inputs
+                for ins, sub_ins, reg_argi in zip(Nrows[m][1], sub_argmap, arg_locs):
+                    add_reg[reg_argi] = ins
+                    add_rows = [find_replace_inrow(row, sub_ins + ofs, ins) for row in add_rows]
 
-				Nrows = Nrows[0:m] + add_rows + Nrows[m+1:]
-				Nreg += add_reg
-			i += 1
+                Nrows = Nrows[0:m] + add_rows + Nrows[m + 1 :]
+                Nreg += add_reg
+            i += 1
 
-		return Nreg, Nrows, OFSes
+        return Nreg, Nrows, OFSes
 
-	print("Unpacking System:", M.namestring)
+    print("Unpacking System:", M.namestring)
 
-	Nreg, Nrows, ofses = reg_extend(M)
+    Nreg, Nrows, ofses = reg_extend(M)
 
-	# for i in Nrows:
-	# 	print i
+    # for i in Nrows:
+    # 	print i
 
-	# print ofses
-	# Nrows = list(M.ET)
-	# outs_to_unpack = [i[0] for i in ofses]
-	# for ofs in ofses:
-	# 	m = [ i for i,j in enumerate(M.ET) if j[2]==ofs[0]][0]
-	#	# find index of matching row
-	# 	add_rows = [offset_row(row,ofs[1]) for row in Nrows[m][0].ET]
+    # print ofses
+    # Nrows = list(M.ET)
+    # outs_to_unpack = [i[0] for i in ofses]
+    # for ofs in ofses:
+    # 	m = [ i for i,j in enumerate(M.ET) if j[2]==ofs[0]][0]
+    # 	# find index of matching row
+    # 	add_rows = [offset_row(row,ofs[1]) for row in Nrows[m][0].ET]
 
-	# 	# replace output
-	# 	add_rows = [find_replace_inrow(row,ofs[1],ofs[0]) for row in add_rows]
-	# 	# replace input
-	# 	for ins,sub_ins in zip(Nrows[m][1],ofs[3]):
-	# 		add_rows = [find_replace_inrow(row,sub_ins+ofs[1],ins) \
-	#				for row in add_rows]
+    # 	# replace output
+    # 	add_rows = [find_replace_inrow(row,ofs[1],ofs[0]) for row in add_rows]
+    # 	# replace input
+    # 	for ins,sub_ins in zip(Nrows[m][1],ofs[3]):
+    # 		add_rows = [find_replace_inrow(row,sub_ins+ofs[1],ins) \
+    # 				for row in add_rows]
 
-	# 	Nrows = Nrows[0:m] + add_rows + Nrows[m+1:]
+    # 	Nrows = Nrows[0:m] + add_rows + Nrows[m+1:]
 
-	# Mnew = MDL(M.namestring+"_unpacked")
-	Mnew = copy.copy(M)
-	Mnew.namestring += "_unpacked"
+    # Mnew = MDL(M.namestring+"_unpacked")
+    Mnew = copy.copy(M)
+    Mnew.namestring += "_unpacked"
 
-	Mnew.ET = Nrows
-	Mnew.ETregister = Nreg
-	Mnew.table_rep_stride()
-	Mnew.verify_table()
-	Mnew.ETvalid = [0]*len(Nreg)
+    Mnew.ET = Nrows
+    Mnew.ETregister = Nreg
+    Mnew.table_rep_stride()
+    Mnew.verify_table()
+    Mnew.ETvalid = [0] * len(Nreg)
 
-	# Mnew.print_table()
+    # Mnew.print_table()
 
-	assert Mnew.ETflag[0]
+    assert Mnew.ETflag[0]
 
-	# print min_tuples
-	# print Mnew.argmap
+    # print min_tuples
+    # print Mnew.argmap
 
-	# print "Done Unpacked System:", Mnew.namestring, "\n"
+    # print "Done Unpacked System:", Mnew.namestring, "\n"
 
-	return Mnew
+    return Mnew
+
 
 def verify(A):
-	"""necessary test if A is a valid function block"""
-	maybe_valid = True
+    """necessary test if A is a valid function block"""
+    maybe_valid = True
 
-	attr_names = ['out','namestring','inargs','passargs','cstates']
-	nec_attr = [hasattr(A,i) for i in attr_names]
-	der_attr = hasattr(A,'der')
+    attr_names = ["out", "namestring", "inargs", "passargs", "cstates"]
+    nec_attr = [hasattr(A, i) for i in attr_names]
+    der_attr = hasattr(A, "der")
 
-	if not all(nec_attr):
-		maybe_valid = False
-		print(A, "does not have:")
-		# print nec_attr
-		for name,a in zip(attr_names,nec_attr):
-			if not a: print(name)
+    if not all(nec_attr):
+        maybe_valid = False
+        print(A, "does not have:")
+        # print nec_attr
+        for name, a in zip(attr_names, nec_attr):
+            if not a:
+                print(name)
 
-	if nec_attr[0] and der_attr:
-		if not A.der.func_code.co_argcount == A.out.func_code.co_argcount:
-			maybe_valid = False
-			print(A, "out and der don't have equal number of arguments")
-	if nec_attr[2] and nec_attr[3]:
-		if not len(A.passargs) <= A.inargs:
-			maybe_valid = False
-			print(A, "passargs/inargs not right")
-	return maybe_valid
+    if nec_attr[0] and der_attr:
+        if not A.der.func_code.co_argcount == A.out.func_code.co_argcount:
+            maybe_valid = False
+            print(A, "out and der don't have equal number of arguments")
+    if nec_attr[2] and nec_attr[3]:
+        if not len(A.passargs) <= A.inargs:
+            maybe_valid = False
+            print(A, "passargs/inargs not right")
+    return maybe_valid
 
 
 def test8():
-	import numpy as np
-	import matplotlib.pyplot as plt
-	import ode_solvers as ode
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import ode_solvers as ode
 
-	x_ref = [1.0]
-	y_pass = [-2.0]
-	T = np.arange(0,10.0,0.01)
+    x_ref = [1.0]
+    y_pass = [-2.0]
+    T = np.arange(0, 10.0, 0.01)
 
-	def G_der(t,x,u,u_2):
-		A = np.matrix('0 1; -1 -2')
-		B = np.matrix('0;1')
-		xdot = A*x + B*u
-		return xdot
-	def G_out(t,x,u,u_2):
-		C = np.matrix('1 0')
-		y = C*x + u_2[0]
-		return y
+    def G_der(t, x, u, u_2):
+        A = np.matrix("0 1; -1 -2")
+        B = np.matrix("0;1")
+        xdot = A * x + B * u
+        return xdot
 
-	def K_der(t,x,e):
-		return np.array([])
-	def K_out(t,x,e):
-		Kmat = np.matrix('1 2')
-		u = Kmat*e
-		return u
+    def G_out(t, x, u, u_2):
+        C = np.matrix("1 0")
+        y = C * x + u_2[0]
+        return y
 
-	def L_der(t,x,u,y):
-		return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0,0] ])
-	def L_out(t,x,u,y):
-		L = np.matrix('0.5; 1.5')
-		return 1.0*x+ 0.0*L*y
-	
-	
-	G = MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
-	diff = MDLBase(None, lambda t,x,a,b: a-b, 2, [0,1], [], name="diff_sys")
-	K = MDLBase(None, K_out, 1, [0], [], name="K_sys")
-	L = MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
-	
-	sys_cfg = (G,K,diff,[],L,1,0,[])
-	M = MDL(sys_cfg,"sys_model_1")
-	print(M.table())
-	x0 = M.get_x0()
-	x0 = np.array(x0, ndmin=2).T
-	print(x0)
+    def K_der(t, x, e):
+        return np.array([])
 
-	T,X = ode.rungekutta4ad(M.der, x_ref,y_pass, T, x0 )
-	Y = [ M.out(t,x,x_ref,y_pass) for t,x in zip(T,X) ]
-	
-	print(T[-1])
-	print(X[-1])
-	print(Y[-1])
-	plt.plot(T,[np.array(x)[:,0] for x in X])
-	plt.show()
+    def K_out(t, x, e):
+        Kmat = np.matrix("1 2")
+        u = Kmat * e
+        return u
+
+    def L_der(t, x, u, y):
+        return np.array([x[1], -1.0 * x[0] - 2.0 * x[1] + u[0, 0]])
+
+    def L_out(t, x, u, y):
+        L = np.matrix("0.5; 1.5")
+        return 1.0 * x + 0.0 * L * y
+
+    G = MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
+    diff = MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], [], name="diff_sys")
+    K = MDLBase(None, K_out, 1, [0], [], name="K_sys")
+    L = MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
+
+    sys_cfg = (G, K, diff, [], L, 1, 0, [])
+    M = MDL(sys_cfg, "sys_model_1")
+    print(M.table())
+    x0 = M.get_x0()
+    x0 = np.array(x0, ndmin=2).T
+    print(x0)
+
+    T, X = ode.rungekutta4ad(M.der, x_ref, y_pass, T, x0)
+    Y = [M.out(t, x, x_ref, y_pass) for t, x in zip(T, X)]
+
+    print(T[-1])
+    print(X[-1])
+    print(Y[-1])
+    plt.plot(T, [np.array(x)[:, 0] for x in X])
+    plt.show()
+
 
 def main():
-	test8()
+    test8()
+
 
 if __name__ == "__main__":
-	main()
+    main()
