@@ -86,7 +86,6 @@ def G_old():
 	G_old.passargs = [1]
 
 G_old()
-G = sl.MDLBase(G_old.der, G_old.out, G_old.inargs, G_old.passargs, G_old.cstates, name="G_sys")
 
 def K_old():
 
@@ -114,7 +113,6 @@ def K_old():
 	K_old.passargs = [0]
 
 K_old()
-K = sl.MDLBase(K_old.der, K_old.out, K_old.inargs, K_old.passargs, K_old.cstates, name="K_sys")
 
 
 def L_old():
@@ -134,10 +132,6 @@ def L_old():
 	L_old.passargs = [1]
 
 L_old()
-L = sl.MDLBase(L_old.der, L_old.out, L_old.inargs, L_old.passargs, L_old.cstates, name="L_sys")
-
-
-diff = sl.MDLBase(None, lambda a,b: a-b, 2, [0,1], 0, name="diff_sys")
 
 def ES():
 	#external source
@@ -315,13 +309,19 @@ def test8():
 	x_ref = [1.0]
 	
 	T = np.arange(0,10.0,0.01)
+	
+	
+	G = sl.MDLBase(G_old.der, G_old.out, 2, [1], [1.0, 0.6], name="G_sys")
+	diff = sl.MDLBase(None, lambda a,b: a-b, 2, [0,1], [], name="diff_sys")
+	K = sl.MDLBase(K_old.der, K_old.out, 1, [0], [], name="K_sys")
+	L = sl.MDLBase(L_old.der, L_old.out, 2, [1], [0.0, 0.0], name="L_sys")
 	sys_cfg = (G,K,diff,[],L,1,0,[])
-	x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
 	# sys_cfg = (G,K,[],L,0,1) # try this, it'll cause an error
 
-	M = sl.MDL(sys_cfg,"this")
-	M.print_table()
-	x0 = np.transpose(np.matrix(M.x0))
+	M = sl.MDL(sys_cfg,"sys_model_1")
+	print(M.table())
+	x0 = M.get_x0()
+	print(x0)
 
 	T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
 	Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
@@ -379,7 +379,59 @@ def test7():
 	print(X[-1])
 	print(Y[-1].probe_s([0],[1,0],[1,1]))
 
+def test9():
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import ode_solvers as ode
 
+	x_ref = [1.0]
+	y_pass = [-2.0]
+	T = np.arange(0,10.0,0.01)
+
+	def G_der(t,x,u,u_2):
+		A = np.matrix('0 1; -1 -2')
+		B = np.matrix('0;1')
+		xdot = A*x + B*u
+		return xdot
+	def G_out(t,x,u,u_2):
+		C = np.matrix('1 0')
+		y = C*x + u_2[0]
+		return y
+
+	def K_der(t,x,e):
+		return np.array([])
+	def K_out(t,x,e):
+		Kmat = np.matrix('1 2')
+		u = Kmat*e
+		return u
+
+	def L_der(t,x,u,y):
+		return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0,0] ])
+	def L_out(t,x,u,y):
+		L = np.matrix('0.5; 1.5')
+		return 1.0*x+ 0.0*L*y
+	
+	
+	G = sl.MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
+	diff = sl.MDLBase(None, lambda t,x,a,b: a-b, 2, [0,1], [], name="diff_sys")
+	K = sl.MDLBase(None, K_out, 1, [0], [], name="K_sys")
+	L = sl.MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
+	
+	sys_cfg = (G,K,diff,[],L,1,0,[])
+	M = sl.MDL(sys_cfg,"sys_model_1")
+	print(M.table())
+	x0 = M.get_x0()
+	x0 = np.array(x0, ndmin=2).T
+	print(x0)
+
+	T,X = ode.rungekutta4ad(M.der, x_ref,y_pass, T, x0 )
+	Y = [ M.out(t,x,x_ref,y_pass) for t,x in zip(T,X) ]
+	
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1])
+	plt.plot(T,[np.array(x)[:,0] for x in X])
+	plt.show()
 
 
 
@@ -388,4 +440,4 @@ def test7():
 
 if __name__ == '__main__':
 	# print(sl.__doc__)
-	test8()
+	test9()

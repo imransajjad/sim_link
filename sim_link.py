@@ -14,34 +14,26 @@ imransajjad89@gmail.com
 
 Basic workflow:
 
-Step 1: Write functions representing models of dynamic systems, for example:
+Step 1: Write functions representing models of dynamic systems and then create
+MDL-like objects, for example:
 
 ---
 
-def L():
+def der(t,x,u,y):
+	# x1dot = x2dot
+	# x2dot = -1.0*x1 -2.0*x2 + u
+	return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0] ])
+def out(t,x,u,y):
+	# xhat = x + L*y
+	return 0.5*np.array(x)+ np.array([0.5, 1.5])*np.array(y)
 
-	def der(t,x,u,y):
-		# x1dot = x2dot
-		# x2dot = -1.0*x1 -2.0*x2 + u
-		return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0] ])
-	def out(t,x,u,y):
-		# xhat = x + L*y
-		return 0.5*np.array(x)+ np.array([0.5, 1.5])*np.array(y)
-	
-	L.der = der
-	L.out = out
-
-	L.namestring = "Observer L"
-	L.inargs = 2 # number of continous states
-	L.cstates = 2 # number of input arguments in addition to t and x
-	L.passargs = [1] # indices of input arguments actually used in L.out
-					# in this case, y is a passthrough argument
+L = sl.MDLBase(der, out, 2, [1], [0.0, 0.0], name="Observer L")
+# 2 is number of inputs (u and y)
+# [1] is indices of inputs that are required to compute output (y)
+# [0.0, 0.0] is the initial state vector inside the system
+# name="Observer L" is a human readable name to be used to identify the block
 
 ---
-
-L() should be callable (to initialize) and L.der and L.out should have the same
-input arguments.
-
 
 
 Step 2: Connect such systems together and evaluate
@@ -241,7 +233,7 @@ class MDLBase(object):
 	"""
 	MDLBase serves as the base for other model type objects
 	"""
-	def __init__(self, der, out, n_inargs, passargs, cstates, name="MDLBase"):
+	def __init__(self, der, out, n_inargs, passargs, x0, name="MDLBase"):
 		self.name = name
 
 		self.der = der # the function to calculate the derivates of the state vector
@@ -249,7 +241,11 @@ class MDLBase(object):
 
 		self.passargs = passargs # the list of passargs is required
 		self.inargs = n_inargs # number of input arguments
-		self.cstates = cstates # number of states in state vector
+		self.x0 = x0 # the initial state vector
+		self.cstates = len(x0) # number of states in state vector
+	
+	def get_x0(self):
+		return self.x0
 	
 	def __repr__(self):
 		return f"MDL:{self.name}"
@@ -390,14 +386,29 @@ class MDL(MDLBase):
 		return "Valid"
 
 
+	def get_x0(self):
+		sys_list = filter(lambda e: isinstance(e,MDLBase), self.signal_reg)
+		x0 = [x for s in sys_list for x in s.get_x0()]
+		return x0
+
+	# def flatten_state(self, x):
+	# 	x_flat = 
+	# 	return x_flat
+
+	# def unflatten_state(self, x_flat):
+	# 	x = 
+	# 	return x
+
 	def mdl_out(self,t,x,*inputs):
 		"""
 		evaluate only till output is reached and return output
 		"""
 		y = list(self.signal_reg)
+		for i,arg_pos in enumerate(self.argmap):
+			y[arg_pos] = inputs[i]
 		x_stride = 0
 		for obj, inputs_map, cstates, output in self.exec_table:
-			obj_inputs = y[inputs_map]
+			obj_inputs = [y[i] for i in inputs_map]
 			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
 			if output == 0:
 				return y[0]
@@ -409,19 +420,23 @@ class MDL(MDLBase):
 		evaluate everything and return an output vector
 		"""
 		y = list(self.signal_reg)
+		for i,arg_pos in enumerate(self.argmap):
+			y[arg_pos] = inputs[i]
 		x_stride = 0
 		for obj, inputs_map, cstates, output in self.exec_table:
-			obj_inputs = y[inputs_map]
+			obj_inputs = [y[i] for i in inputs_map]
 			y[output] = obj.out(t, x[x_stride:x_stride+cstates], *obj_inputs)
 			x_stride += cstates
 		return y
 
 	def mdl_der(self,t,x,*inputs):
-		signals = self.probes(t,x,*inputs)
+		y = self.probes(t,x,*inputs)
 		dx = copy.copy(x)
 		x_stride = 0
 		for obj, inputs_map, cstates, output in self.exec_table:
-			obj_inputs = y[inputs_map]
+			if not obj.der and obj.cstates == 0:
+				continue
+			obj_inputs = [y[i] for i in inputs_map]
 			dx[x_stride:x_stride+cstates] = obj.der(t, x[x_stride:x_stride+cstates], *obj_inputs)
 			x_stride += cstates
 		return dx
@@ -443,23 +458,15 @@ class MDL(MDLBase):
 		print("Valid probe values [and states]:")
 		pp(self,"",0)
 
-
-
-	def print_table(self):
-		print(f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}")
+	def table(self):
+		string = ""
+		string += f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}\n"
 		for obj, inputs, cstates, output in self.exec_table:
-			i_string = [ str(i_s) for i,i_s in enumerate(inputs)]
-			if not isinstance(obj,list):
-				for i in obj.passargs:
-					i_string[i] += "p"
-			print(f"\t{obj.name}, ins:{i_string}, cstates: {cstates}, out: {output}")
-		print("Table valid:", self.table_valid)
-		# self.print_register()
-		# if self.ETflag[0]:
-		# 	self.print_addinfo()
-		# 	self.print_probes()
-		
-		print("\nEnd System Execution Table ("+ self.name +")\n--------------\n")
+			i_list = [ f"{inp}" + ("p" if i in obj.passargs else "") for i,inp in enumerate(inputs)]
+			string += f"\t{obj.name}, ins:[{', '.join(i_list)}], cstates: {cstates}, out: {output}\n"
+		string += f"Table valid: {self.table_valid}\n"
+		string += "End System Execution Table ("+ self.name +")\n--------------"
+		return string
 
 	def print_register(self):
 		print("\nSystem signal register:")
@@ -628,3 +635,62 @@ def verify(A):
 	return maybe_valid
 
 
+def test8():
+	import numpy as np
+	import matplotlib.pyplot as plt
+	import ode_solvers as ode
+
+	x_ref = [1.0]
+	y_pass = [-2.0]
+	T = np.arange(0,10.0,0.01)
+
+	def G_der(t,x,u,u_2):
+		A = np.matrix('0 1; -1 -2')
+		B = np.matrix('0;1')
+		xdot = A*x + B*u
+		return xdot
+	def G_out(t,x,u,u_2):
+		C = np.matrix('1 0')
+		y = C*x + u_2[0]
+		return y
+
+	def K_der(t,x,e):
+		return np.array([])
+	def K_out(t,x,e):
+		Kmat = np.matrix('1 2')
+		u = Kmat*e
+		return u
+
+	def L_der(t,x,u,y):
+		return np.array([ x[1], -1.0*x[0] -2.0*x[1] + u[0,0] ])
+	def L_out(t,x,u,y):
+		L = np.matrix('0.5; 1.5')
+		return 1.0*x+ 0.0*L*y
+	
+	
+	G = MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
+	diff = MDLBase(None, lambda t,x,a,b: a-b, 2, [0,1], [], name="diff_sys")
+	K = MDLBase(None, K_out, 1, [0], [], name="K_sys")
+	L = MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
+	
+	sys_cfg = (G,K,diff,[],L,1,0,[])
+	M = MDL(sys_cfg,"sys_model_1")
+	print(M.table())
+	x0 = M.get_x0()
+	x0 = np.array(x0, ndmin=2).T
+	print(x0)
+
+	T,X = ode.rungekutta4ad(M.der, x_ref,y_pass, T, x0 )
+	Y = [ M.out(t,x,x_ref,y_pass) for t,x in zip(T,X) ]
+	
+	print(T[-1])
+	print(X[-1])
+	print(Y[-1])
+	plt.plot(T,[np.array(x)[:,0] for x in X])
+	plt.show()
+
+def main():
+	test8()
+
+if __name__ == "__main__":
+	main()
