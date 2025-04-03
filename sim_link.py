@@ -27,7 +27,7 @@ def out(t,x,u,y):
     # xhat = x + L*y
     return 0.5*np.array(x)+ np.array([0.5, 1.5])*np.array(y)
 
-L = sl.MDLBase(der, out, 2, [1], [0.0, 0.0], name="Observer L")
+L = MDLBase(der, out, 2, [1], [0.0, 0.0], name="Observer L")
 # 2 is number of inputs (u and y)
 # [1] is indices of inputs that are required to compute output (y)
 # [0.0, 0.0] is the initial state vector inside the system
@@ -40,11 +40,11 @@ Step 2: Connect such systems together and evaluate
 
 When providing a tuple to the system think of it as unpacking an expression:
 
-G(K(x_ref,L(K(...),G(...))))  => (G,K,[],L,1,0)
+G(K(diff(x_ref,L(K(...),G(...)))))  => (G,K,diff,[],L,1,0)
 
-Note: There is no guarantee that an arbitrary
-expression like the one on the right will work, but I've tried my best
-to make the ones on the left work for all cases
+Note: There is no guarantee that an arbitrary expression like the one on the
+right will work, but I've tried my best to make the ones on the left work for
+all cases
 
 elements in this tuple can only be:
 
@@ -56,13 +56,13 @@ The order of elements here is important!!!
 
 For example, here is test code for the system:
 
-           ------         ------
-x_ref --->|  K   |------>|  G   |-------->
-           ------   |     ------   |
-             ^      V              |
-             |    ------           |
-              ---|  L   |<---------
-                  ------
+          __     ------         ------
+x_ref -->|+-|-->|  K   |------>|  G   |-------->
+          --     ------   |     ------   |
+          ^               V              |
+          |             ------           |
+           ------------|  L   |<---------
+                        ------
 
 If this is taken to be the usual plant, observer controller system,
 the signals on the wires should be evaluated in the order G,L,K
@@ -79,15 +79,14 @@ def test8():
     x_ref = [1.0]
 
     T = np.arange(0,10.0,0.01)
-    sys = (G,K,[],L,1,0)
-    x0 = ([1.0, 0.6],[],[],[0.0,0.0],[],[],[])
-    # sys = (G,K,[],L,0,1) # try this, it'll cause an error
+    sys = (G,K,diff,[],L,1,0)
+    # sys = (G,K,diff,[],L,0,1) # try this, it'll cause an error
 
     M = sl.MDL(sys,x0,"this")
     x0 = np.transpose(np.matrix(M.x0))
 
     T,X = ode.rungekutta4ad(M.der, x_ref,T, x0 )
-    Y = [ M.out(t,x,x_ref).probe_s([0],[1]) for t,x in zip(T,X) ]
+    Y = [ M.out(t,x,x_ref) for t,x in zip(T,X) ]
 
     print T[-1]
     print X[-1]
@@ -105,7 +104,7 @@ Basic ideas:
 
 2. evaluation order has to be correct for out
     no algebraic loops are allowed,
-    so MDL builds an execution table which der and out then use
+    MDL builds an execution table which der and out then use
     order of der execution doesn't really matter as long as out has been
     evaluated
     passargs are necessary to eliminate false positives in algebraic
@@ -222,6 +221,56 @@ class out_list(list):
         return [self.probe(*i) for i in probe_indices]
 
 
+class XList(object):
+    """
+    A list like data type that uses np arrays as its atomic objects and
+    supports addition and scalar multiplication
+    """
+
+    def __init__(self, init_list):
+        self._list = list(init_list)
+
+    def __add__(self, other):
+        """
+        only support adding scalar 0. otherwise only XList can be added to XList
+        """
+        if other == 0:
+            return XList(self._list)
+        return XList([a + b if not (a is None or b is None) else None for a, b in zip(self._list, other)])
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __mul__(self, other):
+        """
+        only support scalar multiplication
+        """
+        assert not isinstance(other, XList)
+        return XList([a * other if not (a is None) else None for a in self._list])
+
+    def __lmul__(self, other):
+        return self.__mul__(other)
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        """
+        only support scalar division on right
+        """
+        assert not isinstance(other, XList)
+        return XList([a / other if not (a is None) else None for a in self._list])
+
+    def __getitem__(self, index):
+        return self._list.__getitem__(index)
+
+    def __setitem__(self, key, value):
+        return self._list.__setitem__(key, value)
+
+    def __repr__(self):
+        return f"XList: {self._list.__repr__()}"
+
+
 class SignalType(object):
     """
     A small helper class for entries in MDL.signals_valid
@@ -251,7 +300,6 @@ class MDLBase(object):
         self.passargs = passargs  # the list of passargs is required
         self.inargs = n_inargs  # number of input arguments
         self.x0 = x0  # the initial state vector
-        self.cstates = len(x0)  # number of states in state vector
 
     def get_x0(self):
         return self.x0
@@ -265,8 +313,7 @@ class MDL(MDLBase):
     MDL is an MDLBase type of object that combines other MDL type objects into a system
     """
 
-    def __init__(self, sys, name):
-        # super(MDL, self).__init__()
+    def __init__(self, sys, name=""):
         self.name = name
         self.der = self.mdl_der
         self.out = self.mdl_out
@@ -278,9 +325,10 @@ class MDL(MDLBase):
 
         # these value are used in execution
         self.exec_table = []  # a table of the MDL type objects in sys only, ordered
-        # each entry is (sys, inputs_map, cstates, output_map)
+        # each entry is (sys, inputs_map, states_map, output_map)
         self.exec_table_outrow = -1  # the location of the output in the exec table
         self.signal_reg = list(sys)  # a list of all the signals in the model
+        self.sys_list = [s if isinstance(s, MDLBase) else None for s in self.signal_reg]
 
         self.passargs_map = []
 
@@ -295,7 +343,6 @@ class MDL(MDLBase):
         self.argmap = [i for i, r in enumerate(self.signal_reg) if isinstance(r, list)]
 
         self.inargs = len(self.argmap)
-        self.cstates = sum([obj.cstates for obj, _, _, _ in self.exec_table])
         self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
 
         self.table_valid = self.verify_table()
@@ -334,7 +381,6 @@ class MDL(MDLBase):
         generate exec table recursively starting at the Nth signal in MDL.signal_reg
         return the index of MDL.signal_reg that was just evaluated or in case of
         a reference, the index of what was refered to
-
         """
         obj = self.signal_reg[N]
 
@@ -348,7 +394,6 @@ class MDL(MDLBase):
 
             # then if obj has passargs, make sure where they come from is evaluated first
 
-            out_pos = N
             j = N
             for i in range(0, obj.inargs):
 
@@ -363,12 +408,11 @@ class MDL(MDLBase):
                         self.passargs_map.append(j)
                 j = self.eval_table(j)
 
-            if True:
-                new = (obj, argmap, obj.cstates, out_pos)
-                if out_pos == 0:
-                    print_debug("\tFound mdl output")
-                    self.exec_table_outrow = len(self.exec_table)
-                self.exec_table.append(new)
+            new = (obj, argmap, N)
+            if N == 0:
+                print_debug("\tFound mdl output")
+                self.exec_table_outrow = len(self.exec_table)
+            self.exec_table.append(new)
             return j
 
         elif isinstance(obj, int):
@@ -384,25 +428,23 @@ class MDL(MDLBase):
             return N
 
     def verify_table(self):
-        p_inputs_table = [([argmap[i] for i in obj.passargs], obj) for obj, argmap, _, _ in self.exec_table]
-        for row, (obj, _, _, output) in enumerate(self.exec_table):
+        """
+        Find algebraic loops in the system
+        """
+        p_inputs_table = [([argmap[i] for i in obj.passargs], obj) for obj, argmap, _ in self.exec_table]
+        for row, (obj, _, output) in enumerate(self.exec_table):
             for i, (p_input, p_input_obj) in enumerate(p_inputs_table[0 : (row + 1)]):
                 if output in p_input:
                     return f"Algebraic loop: output ({output}) of entry {row}:{obj} is required by entry {i}:{p_input_obj}"
         return "Valid"
 
     def get_x0(self):
-        sys_list = filter(lambda e: isinstance(e, MDLBase), self.signal_reg)
-        x0 = [x for s in sys_list for x in s.get_x0()]
+        """
+        Get the state of the system in a list of state vectors in the same order
+        as the system tuple
+        """
+        x0 = XList([s.get_x0() if s else None for s in self.sys_list])
         return x0
-
-    # def flatten_state(self, x):
-    # 	x_flat =
-    # 	return x_flat
-
-    # def unflatten_state(self, x_flat):
-    # 	x =
-    # 	return x
 
     def mdl_out(self, t, x, *inputs):
         """
@@ -411,13 +453,11 @@ class MDL(MDLBase):
         y = list(self.signal_reg)
         for i, arg_pos in enumerate(self.argmap):
             y[arg_pos] = inputs[i]
-        x_stride = 0
-        for obj, inputs_map, cstates, output in self.exec_table:
-            obj_inputs = [y[i] for i in inputs_map]
-            y[output] = obj.out(t, x[x_stride : x_stride + cstates], *obj_inputs)
+        for obj, inputs_map, output in self.exec_table:
+            obj_u = [y[i] for i in inputs_map]
+            y[output] = obj.out(t, x[output], *obj_u)
             if output == 0:
                 return y[0]
-            x_stride += cstates
         return y[0]
 
     def probes(self, t, x, *inputs):
@@ -427,23 +467,21 @@ class MDL(MDLBase):
         y = list(self.signal_reg)
         for i, arg_pos in enumerate(self.argmap):
             y[arg_pos] = inputs[i]
-        x_stride = 0
-        for obj, inputs_map, cstates, output in self.exec_table:
-            obj_inputs = [y[i] for i in inputs_map]
-            y[output] = obj.out(t, x[x_stride : x_stride + cstates], *obj_inputs)
-            x_stride += cstates
+        for obj, inputs_map, output in self.exec_table:
+            obj_u = [y[i] for i in inputs_map]
+            y[output] = obj.out(t, x[output], *obj_u)
         return y
 
     def mdl_der(self, t, x, *inputs):
         y = self.probes(t, x, *inputs)
         dx = copy.copy(x)
-        x_stride = 0
-        for obj, inputs_map, cstates, output in self.exec_table:
-            if not obj.der and obj.cstates == 0:
+        for obj, inputs_map, output in self.exec_table:
+            if not obj.der:
                 continue
-            obj_inputs = [y[i] for i in inputs_map]
-            dx[x_stride : x_stride + cstates] = obj.der(t, x[x_stride : x_stride + cstates], *obj_inputs)
-            x_stride += cstates
+            obj_u = [y[i] for i in inputs_map]
+            dx[output] = obj.der(t, x[output], *obj_u)
+            # for i,pos in enumerate(states_map):
+            # dx[pos] = obj_x[i]
         return dx
 
     def print_probes(self):
@@ -469,23 +507,18 @@ class MDL(MDLBase):
 
     def table(self):
         string = ""
-        string += f"--------------\nSystem Execution Table ({self.name}) inargs: {self.inargs} passargs: {self.passargs} cstates: {self.cstates}\n"
-        for obj, inputs, cstates, output in self.exec_table:
+        string += (
+            f"--------------\n"
+            + f"System Execution Table ({self.name}) inargs: {self.inargs} "
+            + f"passargs: {self.passargs}\n"
+            + f"state: {self.get_x0()}\n"
+        )
+        for obj, inputs, output in self.exec_table:
             i_list = [f"{inp}" + ("p" if i in obj.passargs else "") for i, inp in enumerate(inputs)]
-            string += f"\t{obj.name}, ins:[{', '.join(i_list)}], cstates: {cstates}, out: {output}\n"
+            string += f"\t{obj.name}, ins:[{', '.join(i_list)}], out: {output}\n"
         string += f"Table valid: {self.table_valid}\n"
         string += "End System Execution Table (" + self.name + ")\n--------------"
         return string
-
-    def print_register(self):
-        print("\nSystem signal register:")
-        print("	", [R.namestring if hasattr(R, "namestring") else R for R in self.ETregister])
-
-    def print_addinfo(self):
-        print("\nSystem I/O:")
-        i_string = [str(a) + "p" if i in self.passargs else str(a) for i, a in enumerate(self.argmap)]
-        print("Inputs", i_string)
-        print("Number of cstates", self.cstates, "\n")
 
 
 def go_deep(ins):
@@ -640,7 +673,7 @@ def verify(A):
     return maybe_valid
 
 
-def test8():
+def main_test():
     import numpy as np
     import matplotlib.pyplot as plt
     import ode_solvers as ode
@@ -673,18 +706,16 @@ def test8():
 
     def L_out(t, x, u, y):
         L = np.matrix("0.5; 1.5")
-        return 1.0 * x + 0.0 * L * y
+        return 1.0 * x + L * y
 
-    G = MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
-    diff = MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], [], name="diff_sys")
-    K = MDLBase(None, K_out, 1, [0], [], name="K_sys")
-    L = MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
+    G = MDLBase(G_der, G_out, 2, [1], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
+    diff = MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], np.array([], ndmin=2).T, name="diff_sys")
+    K = MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
+    L = MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-    sys_cfg = (G, K, diff, [], L, 1, 0, [])
-    M = MDL(sys_cfg, "sys_model_1")
+    M = MDL((G, K, diff, [], L, 1, 0, []), name="sys_model_1")
     print(M.table())
     x0 = M.get_x0()
-    x0 = np.array(x0, ndmin=2).T
     print(x0)
 
     T, X = ode.rungekutta4ad(M.der, x_ref, y_pass, T, x0)
@@ -693,12 +724,16 @@ def test8():
     print(T[-1])
     print(X[-1])
     print(Y[-1])
-    plt.plot(T, [np.array(x)[:, 0] for x in X])
+
+    G_x = [x[0] for x in X]
+    L_x = [x[4] for x in X]
+    plt.plot(T, [np.array(x)[:, 0] for x in G_x])
+    plt.plot(T, [np.array(x)[:, 0] for x in L_x])
     plt.show()
 
 
 def main():
-    test8()
+    main_test()
 
 
 if __name__ == "__main__":

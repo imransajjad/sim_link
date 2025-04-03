@@ -428,18 +428,16 @@ def test9():
 
     def L_out(t, x, u, y):
         L = np.matrix("0.5; 1.5")
-        return 1.0 * x + 0.0 * L * y
+        return 1.0 * x + L * y
 
-    G = sl.MDLBase(G_der, G_out, 2, [1], [1.0, 0.6], name="G_sys")
-    diff = sl.MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], [], name="diff_sys")
-    K = sl.MDLBase(None, K_out, 1, [0], [], name="K_sys")
-    L = sl.MDLBase(L_der, L_out, 2, [1], [0.0, 0.0], name="L_sys")
+    G = sl.MDLBase(G_der, G_out, 2, [1], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
+    diff = sl.MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], np.array([], ndmin=2).T, name="diff_sys")
+    K = sl.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
+    L = sl.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-    sys_cfg = (G, K, diff, [], L, 1, 0, [])
-    M = sl.MDL(sys_cfg, "sys_model_1")
+    M = sl.MDL((G, K, diff, [], L, 1, 0, []), name="sys_model_1")
     print(M.table())
     x0 = M.get_x0()
-    x0 = np.array(x0, ndmin=2).T
     print(x0)
 
     T, X = ode.rungekutta4ad(M.der, x_ref, y_pass, T, x0)
@@ -448,7 +446,11 @@ def test9():
     print(T[-1])
     print(X[-1])
     print(Y[-1])
-    plt.plot(T, [np.array(x)[:, 0] for x in X])
+
+    G_x = [x[0] for x in X]
+    L_x = [x[4] for x in X]
+    plt.plot(T, [np.array(x)[:, 0] for x in G_x])
+    plt.plot(T, [np.array(x)[:, 0] for x in L_x])
     plt.show()
 
 
