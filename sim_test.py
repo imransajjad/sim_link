@@ -433,29 +433,39 @@ def test_GLK():
     M = sl.MDL((G, K, sll.gain(10), sll.sub(), [], L, 1, 0), name="sys_model_1")
     print(M.table())
     x0 = M.get_x0()
-    print(x0)
+    print("x0 =",x0)
 
     T, X = ode.rungekutta4ad(M.der, x_ref, T, x0)
     Y = [M.out(t, x, x_ref, probes=True) for t, x in zip(T, X)]
 
-    print(T[-1])
-    print(X[-1], type(X[0]))
-    print(Y[-1], type(Y[0]))
+    print("T[-1] =",T[-1])
+    print("X[-1] =",X[-1], type(X[0]))
+    print("Y[-1] =",Y[-1], type(Y[0]))
 
-    G_x = [np.array(x[0])[:,0] for x in X]
-    L_x = [np.array(x[5])[:,0] for x in X]
+    G_x = [np.array(x["G_sys"])[:,0] for x in X]
+    L_x = [np.array(x["L_sys"])[:,0] for x in X]
 
-    fig, axes = plt.subplots(3,1)
-    axes[0].grid(True)
-    axes[1].grid(True)
-    axes[2].grid(True)
-    axes[0].plot(T, [x[0] for x in G_x])
-    axes[0].plot(T, [x[0] for x in L_x])
-    axes[1].plot(T, [x[1] for x in G_x])
-    axes[1].plot(T, [x[1] for x in L_x])
+    x_ref = [np.array(y["sys_model_1_u_0"])[:,0] for y in Y]
+    G_y = [np.array(y["G_sys"])[:,0] for y in Y]
+    L_y = [np.array(y["L_sys"])[:,0] for y in Y]
+
+    fig, axes = plt.subplots(4,1)
+    axes[0].plot(T, [x[0] for x in G_x], label="G_x0")
+    axes[0].plot(T, [x[0] for x in L_x], label="L_x0")
+
+    axes[1].plot(T, [x[1] for x in G_x], label="G_x1")
+    axes[1].plot(T, [x[1] for x in L_x], label="L_x1")
+
     axes[2].plot(T, G_x, label="G_x")
     axes[2].plot(T, L_x, label="L_x")
-    axes[2].legend()
+    axes[2].plot(T, x_ref, label="x_ref")
+
+    axes[3].plot(T, G_y, label="G_y")
+    axes[3].plot(T, L_y, label="L_y")
+
+    for ax in axes:
+        ax.grid(True)
+        ax.legend()
 
 if __name__ == "__main__":
     test_GLK()

@@ -171,72 +171,35 @@ I don't want to use isinstance and hasattr so much
 
 """
 
-import copy, traceback
+import copy
 
-passArgModeDeep = True
 verbose = False
-# properly implementing deep passarg mode might involve splitting
-# execution tables and may be too complicated
-
-
 def print_debug(x):
     if verbose:
         print(x)
 
-
-class out_list(list):
-    """docstring for out_list"""
-
-    def getitemnormally(self, index):
-        return super(out_list, self).__getitem__(index)
-
-    def getfirstitem(self, index):
-        R = self.getitemnormally(index)
-        if isinstance(R, out_list):
-            R = R.getfirstitem(0)
-        return R
-
-    def __getitem__(self, index):
-        return self.getfirstitem(index)
-
-    def probe(self, *indices):
-        # use this recursive function with caution
-        # usually the deepest extracted element is assumed to be a scalar
-        # in case there are elements left in index and the current deepest
-        # element is not a scalar, new_item[indices[1:]] is called which is
-        # equivalent to new_item[2,3,1,...].
-        # so new_item should either have a scalar or a __getitem__ method
-        # that accepts tuples
-
-        if len(indices) > 1:
-            new_item = self.getitemnormally(indices[0])
-            if isinstance(new_item, out_list):
-                return new_item.probe(*indices[1:])
-            else:
-                return new_item[indices[1:]]
-        else:
-            return self.getfirstitem(indices[0])
-
-    def probe_s(self, *probe_indices):
-        return [self.probe(*i) for i in probe_indices]
-
-
 class XList(object):
     """
     A list like data type that uses np arrays as its atomic objects and
-    supports addition and scalar multiplication
+    supports addition and scalar multiplication.
+    Members are accessible like a regular list i.e. x[0], x[1] or if
+    index_strs = ["id_0", "id_1"] is provided at construction,
+    dictionary like access, x["id_0"], x["id_1"] also works
     """
 
-    def __init__(self, init_list):
+    def __init__(self, init_list, index_strs=None):
         self._list = list(init_list)
+        self._index_strs = index_strs
+        if index_strs:
+            self._index = { str_i:i for i,str_i in enumerate(index_strs)}
 
     def __add__(self, other):
         """
         only support adding scalar 0. otherwise only XList can be added to XList
         """
         if other == 0:
-            return XList(self._list)
-        return XList([a + b if not (a is None or b is None) else None for a, b in zip(self._list, other)])
+            return XList(self._list, self._index_strs)
+        return XList([a + b if not (a is None or b is None) else None for a, b in zip(self._list, other)], index_strs=self._index_strs)
 
     def __radd__(self, other):
         return self.__add__(other)
@@ -246,7 +209,7 @@ class XList(object):
         only support scalar multiplication
         """
         assert not isinstance(other, XList)
-        return XList([a * other if not (a is None) else None for a in self._list])
+        return XList([a * other if not (a is None) else None for a in self._list], index_strs=self._index_strs)
 
     def __lmul__(self, other):
         return self.__mul__(other)
@@ -259,16 +222,20 @@ class XList(object):
         only support scalar division on right
         """
         assert not isinstance(other, XList)
-        return XList([a / other if not (a is None) else None for a in self._list])
+        return XList([a / other if not (a is None) else None for a in self._list], index_strs=self._index_strs)
 
     def __getitem__(self, index):
+        if type(index) == str:
+            index = self._index[index]
         return self._list.__getitem__(index)
 
     def __setitem__(self, key, value):
+        if type(key) == str:
+            key = self._index[key]
         return self._list.__setitem__(key, value)
 
     def __repr__(self):
-        return f"XList: {self._list.__repr__()}"
+        return f"XList: keys: {self._index_strs.__repr__()} values: {self._list.__repr__()}"
 
 
 class SignalType(object):
@@ -328,7 +295,6 @@ class MDL(MDLBase):
         # each entry is (sys, inputs_map, states_map, output_map)
         self.exec_table_outrow = -1  # the location of the output in the exec table
         self.signal_reg = list(sys)  # a list of all the signals in the model
-        self.sys_list = [s if isinstance(s, MDLBase) else None for s in self.signal_reg]
 
         self.passargs_map = []
 
@@ -344,6 +310,10 @@ class MDL(MDLBase):
 
         self.inargs = len(self.argmap)
         self.passargs = [i for i, p in enumerate(self.argmap) if p in self.passargs_map]
+
+        self.sys_list = [s.name if isinstance(s, MDLBase) else None for s in self.signal_reg]
+        for i,j in enumerate(self.argmap):
+            self.sys_list[j] = f"{self.name}_u_{i}"
 
         self.table_valid = self.verify_table()
 
@@ -443,7 +413,8 @@ class MDL(MDLBase):
         Get the state of the system in a list of state vectors in the same order
         as the system tuple
         """
-        x0 = XList([s.get_x0() if s else None for s in self.sys_list])
+        state_list = [s.get_x0() if isinstance(s, MDLBase) else None for s in self.signal_reg]
+        x0 = XList(state_list, index_strs=self.sys_list)
         return x0
 
     def mdl_out(self, t, x, *inputs, probes=False):
@@ -458,7 +429,7 @@ class MDL(MDLBase):
             y[output] = obj.out(t, x[output], *obj_u)
             if not probes and output == 0:
                 return y[0]
-        return XList(y)
+        return XList(y, index_strs=self.sys_list)
 
     def mdl_der(self, t, x, *inputs):
         y = self.mdl_out(t, x, *inputs, probes=True)
@@ -470,34 +441,13 @@ class MDL(MDLBase):
             dx[output] = obj.der(t, x[output], *obj_u)
         return dx
 
-    def print_probes(self):
-        def pp(self, ind, state_ofs):
-            for i, r in enumerate(self.ETregister):
-                # print(self)
-
-                row_n = [row for row in self.ET if row[-1] == i]
-                if row_n:
-                    row_n = row_n[0]
-                state_str = (
-                    "[%s:%s]" % (state_ofs + row_n[2], state_ofs + row_n[2] + row_n[0].cstates)
-                    if row_n and row_n[0].cstates
-                    else ""
-                )
-
-                print("%s%d %s %s" % (ind, i, (r.namestring if hasattr(r, "out") else ""), state_str))
-                if isinstance(r, MDL):
-                    pp(r, "   " + ind, state_ofs + row_n[2])
-
-        print("Valid probe values [and states]:")
-        pp(self, "", 0)
-
     def table(self):
         string = ""
         string += (
             f"--------------\n"
             + f"System Execution Table ({self.name}) inargs: {self.inargs} "
             + f"passargs: {self.passargs}\n"
-            + f"state: {self.get_x0()}\n"
+            # + f"state: {self.get_x0()}\n"
         )
         for obj, inputs, output in self.exec_table:
             i_list = [f"{inp}" + ("p" if i in obj.passargs else "") for i, inp in enumerate(inputs)]
@@ -505,15 +455,6 @@ class MDL(MDLBase):
         string += f"Table valid: {self.table_valid}\n"
         string += "End System Execution Table (" + self.name + ")\n--------------"
         return string
-
-
-def go_deep(ins):
-    for i, r in enumerate(ins):
-        if not isinstance(ins[i], int) and not hasattr(ins[i], "out"):
-            while isinstance(ins[i], out_list):
-                # print ins[i], ins[i][0]
-                ins[i] = ins[i][0]
-    return ins
 
 
 def unpack_MDL(M):
