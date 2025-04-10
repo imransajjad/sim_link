@@ -31,193 +31,112 @@ def add(name="add"):
     def out(t, x, a, b):
         return a + b
 
-    return sl.MDLBase(None, out, 2, [0, 1], 0, name=name)
+    return sl.MDLBase(None, out, 2, [0, 1], None, name=name)
 
 
 def sub(name="sub"):
-    """add two signals out=a+b"""
+    """subtract two signals out=a-b"""
 
     def out(t, x, a, b):
         return a - b
 
-    return sl.MDLBase(None, out, 2, [0, 1], 0, name=name)
+    return sl.MDLBase(None, out, 2, [0, 1], None, name=name)
 
 
-def mul():
+def mul(name="mul"):
     """multiply two signals out=a*b"""
-
-    # def der(t,x,a,b):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(t, x, a, b):
         return a * b
 
-    # mul.der = der
-    mul.out = out
-    mul.namestring = "mul"
-
-    mul.inargs = 2
-    mul.cstates = 0
-    mul.passargs = [0, 1]
+    return sl.MDLBase(None, out, 2, [0, 1], None, name=name)
 
 
-def div():
+def div(name="div"):
     """divide two signals out=a/b"""
-
-    # def der(t,x,a,b):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(t, x, a, b):
         return a / b
 
-    # div.der = der
-    div.out = out
-    div.namestring = "div"
-
-    div.inargs = 2
-    div.cstates = 0
-    div.passargs = [0, 1]
+    return sl.MDLBase(None, out, 2, [0, 1], None, name=name)
 
 
-def inv():
+def inv(name="inv"):
     """inverse a signal out=1/u"""
-
-    # def der(t,x,u):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(t, x, u):
-        return 1.0 / u
+        return 1.0 / b
 
-    # inv.der = der
-    inv.out = out
-    inv.namestring = "inv"
-
-    inv.inargs = 1
-    inv.cstates = 0
-    inv.passargs = [0]
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def sat():
+def sat(name="sat"):
     """saturate by -1,1"""
-
-    # def der(t,x,u):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(t, x, u):
         return u * (-1 < u) * (u < 1) + 1 * (u >= 1) - 1 * (u <= -1)
 
-    # inv.der = der
-    sat.out = out
-    sat.namestring = "sat"
-
-    sat.inargs = 1
-    sat.cstates = 0
-    sat.passargs = [0]
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def sgn():
+def sgn(name="sgn"):
     """signum function"""
-
-    # def der(t,x,u):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(t, x, u):
         return 1 * (u > 0) - 1 * (u < 0)
 
-    # inv.der = der
-    sgn.out = out
-    sgn.namestring = "sgn"
-
-    sgn.inargs = 1
-    sgn.cstates = 0
-    sgn.passargs = [0]
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def time():
-    """output time as a signal"""
+def time(name="time"):
+    """multiply input by time"""
 
-    # def der(t,x,a,b):
-    # 	return x[0:0]
-    def out(t, x):
-        return np.matrix([t])
+    def out(t, x, u):
+        return u*t
 
-    time.out = out
-    time.namestring = "time"
-
-    time.inargs = 0
-    time.cstates = 0
-    time.passargs = []
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def sin():
-    """sin(u)"""
+def sine(name="sine"):
+    """take sine of input"""
 
     def out(t, x, u):
         return np.sin(u)
-
-    sin.out = out
-    sin.namestring = "sin"
-    sin.inargs = 1
-    sin.cstates = 0
-    sin.passargs = [0]
+    
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def cos():
-    """cos(u)"""
+def cosine(name="cosine"):
+    """take cosine of input"""
 
     def out(t, x, u):
         return np.cos(u)
-
-    cos.out = out
-    cos.namestring = "cos"
-    cos.inargs = 1
-    cos.cstates = 0
-    cos.passargs = [0]
+    
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def exp():
-    """exp(u)"""
+def exp(name="exp"):
+    """take exp of input"""
 
     def out(t, x, u):
         return np.exp(u)
-
-    exp.out = out
-    exp.namestring = "exp"
-    exp.inargs = 1
-    exp.cstates = 0
-    exp.passargs = [0]
+    
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-def log():
-    """log(u)"""
+def log(name="log"):
+    """take log of input"""
 
     def out(t, x, u):
         return np.log(u)
-
-    log.out = out
-    log.namestring = "log"
-    log.inargs = 1
-    log.cstates = 0
-    log.passargs = [0]
+    
+    return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-class gain(object):
+class gain(sl.MDLBase):
     """gain block out = k*u"""
 
-    def __init__(self, k):
+    def __init__(self, k, name="gain"):
+        super().__init__(None, self.out, 1, [0], None, name=name)
         self.k = k
 
-        self.namestring = "gain (" + str(self.k) + ")"
-
-        self.inargs = 1
-        self.cstates = 0
-        self.passargs = [0]
-
-    # def der(self,t,x,u):
-    # 	xdot = x[0:0]
-    # 	return xdot
     def out(self, t, x, u):
-        y = self.k * u
+        y = self.k*u
         return y
 
 

@@ -3,7 +3,8 @@ import ode_solvers as ode
 import sim_link as sl
 import sim_lib as sll
 import time
-
+import matplotlib.pyplot as plt
+import scipy.integrate as scpi
 
 def B():
 
@@ -395,24 +396,19 @@ def test7():
     print(Y[-1].probe_s([0], [1, 0], [1, 1]))
 
 
-def test9():
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import ode_solvers as ode
-
-    x_ref = [1.0]
-    y_pass = [-2.0]
+def test_GLK():
+    x_ref = np.array([-1.045,0.0], ndmin=2).T
     T = np.arange(0, 10.0, 0.01)
 
-    def G_der(t, x, u, u_2):
+    def G_der(t, x, u):
         A = np.matrix("0 1; -1 -2")
         B = np.matrix("0;1")
         xdot = A * x + B * u
         return xdot
 
-    def G_out(t, x, u, u_2):
+    def G_out(t, x, u):
         C = np.matrix("1 0")
-        y = C * x + u_2[0]
+        y = C * x
         return y
 
     def K_der(t, x, e):
@@ -430,30 +426,37 @@ def test9():
         L = np.matrix("0.5; 1.5")
         return 1.0 * x + L * y
 
-    G = sl.MDLBase(G_der, G_out, 2, [1], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
-    diff = sl.MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], np.array([], ndmin=2).T, name="diff_sys")
+    G = sl.MDLBase(G_der, G_out, 1, [], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
     K = sl.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
     L = sl.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-    M = sl.MDL((G, K, diff, [], L, 1, 0, []), name="sys_model_1")
+    M = sl.MDL((G, K, sll.gain(10), sll.sub(), [], L, 1, 0), name="sys_model_1")
     print(M.table())
     x0 = M.get_x0()
     print(x0)
 
-    T, X = ode.rungekutta4ad(M.der, x_ref, y_pass, T, x0)
-    Y = [M.out(t, x, x_ref, y_pass) for t, x in zip(T, X)]
+    T, X = ode.rungekutta4ad(M.der, x_ref, T, x0)
+    Y = [M.out(t, x, x_ref, probes=True) for t, x in zip(T, X)]
 
     print(T[-1])
-    print(X[-1])
-    print(Y[-1])
+    print(X[-1], type(X[0]))
+    print(Y[-1], type(Y[0]))
 
-    G_x = [x[0] for x in X]
-    L_x = [x[4] for x in X]
-    plt.plot(T, [np.array(x)[:, 0] for x in G_x])
-    plt.plot(T, [np.array(x)[:, 0] for x in L_x])
-    plt.show()
+    G_x = [np.array(x[0])[:,0] for x in X]
+    L_x = [np.array(x[5])[:,0] for x in X]
 
+    fig, axes = plt.subplots(3,1)
+    axes[0].grid(True)
+    axes[1].grid(True)
+    axes[2].grid(True)
+    axes[0].plot(T, [x[0] for x in G_x])
+    axes[0].plot(T, [x[0] for x in L_x])
+    axes[1].plot(T, [x[1] for x in G_x])
+    axes[1].plot(T, [x[1] for x in L_x])
+    axes[2].plot(T, G_x, label="G_x")
+    axes[2].plot(T, L_x, label="L_x")
+    axes[2].legend()
 
 if __name__ == "__main__":
-    # print(sl.__doc__)
-    test9()
+    test_GLK()
+    plt.show()

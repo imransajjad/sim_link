@@ -446,7 +446,7 @@ class MDL(MDLBase):
         x0 = XList([s.get_x0() if s else None for s in self.sys_list])
         return x0
 
-    def mdl_out(self, t, x, *inputs):
+    def mdl_out(self, t, x, *inputs, probes=False):
         """
         evaluate only till output is reached and return output
         """
@@ -456,32 +456,18 @@ class MDL(MDLBase):
         for obj, inputs_map, output in self.exec_table:
             obj_u = [y[i] for i in inputs_map]
             y[output] = obj.out(t, x[output], *obj_u)
-            if output == 0:
+            if not probes and output == 0:
                 return y[0]
-        return y[0]
-
-    def probes(self, t, x, *inputs):
-        """
-        evaluate everything and return an output vector
-        """
-        y = list(self.signal_reg)
-        for i, arg_pos in enumerate(self.argmap):
-            y[arg_pos] = inputs[i]
-        for obj, inputs_map, output in self.exec_table:
-            obj_u = [y[i] for i in inputs_map]
-            y[output] = obj.out(t, x[output], *obj_u)
-        return y
+        return XList(y)
 
     def mdl_der(self, t, x, *inputs):
-        y = self.probes(t, x, *inputs)
+        y = self.mdl_out(t, x, *inputs, probes=True)
         dx = copy.copy(x)
         for obj, inputs_map, output in self.exec_table:
             if not obj.der:
                 continue
             obj_u = [y[i] for i in inputs_map]
             dx[output] = obj.der(t, x[output], *obj_u)
-            # for i,pos in enumerate(states_map):
-            # dx[pos] = obj_x[i]
         return dx
 
     def print_probes(self):
@@ -671,70 +657,3 @@ def verify(A):
             maybe_valid = False
             print(A, "passargs/inargs not right")
     return maybe_valid
-
-
-def main_test():
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import ode_solvers as ode
-
-    x_ref = [1.0]
-    y_pass = [-2.0]
-    T = np.arange(0, 10.0, 0.01)
-
-    def G_der(t, x, u, u_2):
-        A = np.matrix("0 1; -1 -2")
-        B = np.matrix("0;1")
-        xdot = A * x + B * u
-        return xdot
-
-    def G_out(t, x, u, u_2):
-        C = np.matrix("1 0")
-        y = C * x + u_2[0]
-        return y
-
-    def K_der(t, x, e):
-        return np.array([])
-
-    def K_out(t, x, e):
-        Kmat = np.matrix("1 2")
-        u = Kmat * e
-        return u
-
-    def L_der(t, x, u, y):
-        return np.array([x[1], -1.0 * x[0] - 2.0 * x[1] + u[0, 0]])
-
-    def L_out(t, x, u, y):
-        L = np.matrix("0.5; 1.5")
-        return 1.0 * x + L * y
-
-    G = MDLBase(G_der, G_out, 2, [1], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
-    diff = MDLBase(None, lambda t, x, a, b: a - b, 2, [0, 1], np.array([], ndmin=2).T, name="diff_sys")
-    K = MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
-    L = MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
-
-    M = MDL((G, K, diff, [], L, 1, 0, []), name="sys_model_1")
-    print(M.table())
-    x0 = M.get_x0()
-    print(x0)
-
-    T, X = ode.rungekutta4ad(M.der, x_ref, y_pass, T, x0)
-    Y = [M.out(t, x, x_ref, y_pass) for t, x in zip(T, X)]
-
-    print(T[-1])
-    print(X[-1])
-    print(Y[-1])
-
-    G_x = [x[0] for x in X]
-    L_x = [x[4] for x in X]
-    plt.plot(T, [np.array(x)[:, 0] for x in G_x])
-    plt.plot(T, [np.array(x)[:, 0] for x in L_x])
-    plt.show()
-
-
-def main():
-    main_test()
-
-
-if __name__ == "__main__":
-    main()
