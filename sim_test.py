@@ -430,7 +430,7 @@ def test_GLK():
     K = sl.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
     L = sl.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-    M = sl.MDL((G, K, sll.gain(10), sll.sub(), [], L, 1, 0), name="sys_model_1")
+    M = sl.MDL((G, K, sll.Gain(10), sll.sub(), [], L, 1, 0), name="sys_model_1")
     print(M.table())
     x0 = M.get_x0()
     print("x0 =",x0)
@@ -467,6 +467,33 @@ def test_GLK():
         ax.grid(True)
         ax.legend()
 
+def test_filter():
+
+    T = np.arange(0, 10.0, 0.01)
+
+    Source1 = sll.signal_gen(1.0, 2*np.pi*1, name="signal")
+    Filter1 = sll.TransferFunction([1, 1], [1, 2, 1], name="filtered")
+    sys_cfg = (Filter1, Source1)
+
+    M = sl.MDL(sys_cfg, "sys_model_1")
+    print(M.table())
+    x0 = M.get_x0()
+    print(x0)
+
+    T, X = ode.rungekutta4ad(M.der, T, x0)
+    Y = [M.out(t, x, probes=True) for t, x in zip(T, X)]
+
+    fig, axes = plt.subplots(2,1)
+    signal = [np.array(y["signal"]) for y in Y]
+    filtered = [np.array(y["filtered"])[:,0] for y in Y]
+    axes[0].plot(T, signal, label="signal")
+    axes[0].plot(T, filtered, label="filtered")
+
+    for ax in axes:
+        ax.grid(True)
+        ax.legend()
+
 if __name__ == "__main__":
     test_GLK()
+    # test_filter()
     plt.show()

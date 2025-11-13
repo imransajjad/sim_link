@@ -9,6 +9,18 @@ import scipy
 import sim_link as sl
 
 
+# @diagram_block(label="Gain", style="triangle;whiteSpace=wrap;html=1;", geometry=(-60, 150, 60, 80))
+# class Gain(sl.MDLBase):
+#     """gain block out = k*u"""
+
+#     def __init__(self, k, name="gain"):
+#         super().__init__(None, self.out, 1, [0], None, name=name)
+#         self.k = k
+
+#     def out(self, t, x, u):
+#         y = self.k * u
+#         return y
+
 def integrator(name="integrator", x0=None):
     def der(t, x, u):
         xdot = u
@@ -138,7 +150,7 @@ def log(name="log"):
     return sl.MDLBase(None, out, 1, [0], None, name=name)
 
 
-class gain(sl.MDLBase):
+class Gain(sl.MDLBase):
     """gain block out = k*u"""
 
     def __init__(self, k, name="gain"):
@@ -160,10 +172,10 @@ class Observer(sl.MDLBase):
         self.C = C
         self.L = L
 
-    def der(t, x, u, y):
+    def der(self, t, x, u, y):
         return self.A * x + self.B * u
 
-    def out(t, x, u, y):
+    def out(self, t, x, u, y):
         return x + self.L * (y - self.C * x)
 
 
@@ -174,20 +186,21 @@ class StateSpaceLTI(sl.MDLBase):
 
         if not x0:
             x0 = np.array([[0]] * A.shape[1])
+            print("x0 ", x0)
         super().__init__(self.der, self.out, 1, [0] if D else [], x0, name=name)
         self.A = A
         self.B = B
         self.C = C
         self.D = D
 
-    def der(t, x, u):
-        return self.A * x + self.B * u
+    def der(self, t, x, u):
+        return np.matmul(self.A,x) + self.B*u
 
-    def out(t, x, u):
+    def out(self, t, x, u):
         if self.D:
-            return self.C * x + self.D * u
+            return np.matmul(self.C,x) + np.matmul(self.D,u)
         else:
-            return self.C * x
+            return np.matmul(self.C,x)
 
 
 class TransferFunction(StateSpaceLTI):
