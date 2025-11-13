@@ -97,7 +97,12 @@ print(M.table())
 
 ```
 
-To run this example, run ```sim_test.py```.
+To run this example, run
+
+```
+pip install -r requirements.txt
+python3 sim_test.py
+```
 
 
 ## Basic ideas
