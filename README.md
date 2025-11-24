@@ -26,6 +26,8 @@ pip install -e sim_link
 
 ## Basic workflow:
 
+If you want to jump right in, run the code in the [Example](#example) section.
+
 Step 1: Write functions representing models of dynamic systems and then create
 MDL-like objects with the supplied ```MDLBase``` class, for example:
 
@@ -78,6 +80,8 @@ x_ref -->|+-|-->|  K   |------>|  G   |-------->
 If this is taken to be the usual plant, observer controller system,
 the signals on the wires should be evaluated in the order G, L, K, which is accomplished by the following code
 
+## Example
+
 ```python
 import sim_link
 import sim_link.sim_lib as sim_lib
@@ -116,7 +120,8 @@ K = sim_link.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
 L = sim_link.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
 M = sim_link.MDL((G, K, sim_lib.Gain(10), sim_lib.sub(), [], L, 1, 0), name="sys_model_1")
-# M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 0, 1), name="sys_model_1") # try this, it'll cause an algebraic loop error
+# try this, it will cause an algebraic loop error
+# M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 0, 1), name="sys_model_1") 
 
 print(M.table())
 
