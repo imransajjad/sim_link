@@ -11,7 +11,7 @@ sim_link.py is a module that can be imported, it has extensive documentation in 
 You can use pip with the github repo
 
 ```
-pip install https://github.com/imransajjad/sim_link.git@main
+pip install git+https://github.com/imransajjad/sim_link.git@main
 ```
 
 or clone the repo and install
