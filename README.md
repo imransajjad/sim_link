@@ -83,6 +83,7 @@ import sim_link
 import sim_link.sim_lib as sim_lib
 import sim_link.ode_solvers as ode
 import numpy as np
+import matplotlib.pyplot as plt
 
 def G_der(t, x, u):
     A = np.matrix("0 1; -1 -2")
@@ -114,22 +115,50 @@ G = sim_link.MDLBase(G_der, G_out, 1, [], np.array([1.0, 0.6], ndmin=2).T, name=
 K = sim_link.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
 L = sim_link.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 1, 0), name="sys_model_1")
+M = sim_link.MDL((G, K, sim_lib.Gain(10), sim_lib.sub(), [], L, 1, 0), name="sys_model_1")
 # M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 0, 1), name="sys_model_1") # try this, it'll cause an algebraic loop error
 
 print(M.table())
 
 # M is now a model like object and M.der can be passed to an ODE solver
-T, X = ode.rungekutta4ad(M.der, T, M.get_x0())
+x_ref = np.array([-1.045, 0.0], ndmin=2).T
+T = np.arange(0, 10.0, 0.01)
+T, X = ode.rungekutta4ad(M.der, x_ref, T, M.get_x0())
+Y = [M.out(t, x, x_ref, probes=True) for t, x in zip(T, X)]
 
+print("T[-1] =", T[-1])
+print("X[-1] =", X[-1], type(X[0]))
+print("Y[-1] =", Y[-1], type(Y[0]))
+
+G_x = [np.array(x["G_sys"])[:, 0] for x in X]
+L_x = [np.array(x["L_sys"])[:, 0] for x in X]
+
+x_ref = [np.array(y["sys_model_1_u_0"])[:, 0] for y in Y]
+G_y = [np.array(y["G_sys"])[:, 0] for y in Y]
+L_y = [np.array(y["L_sys"])[:, 0] for y in Y]
+
+fig, axes = plt.subplots(4, 1)
+axes[0].plot(T, [x[0] for x in G_x], label="G_x0")
+axes[0].plot(T, [x[0] for x in L_x], label="L_x0")
+
+axes[1].plot(T, [x[1] for x in G_x], label="G_x1")
+axes[1].plot(T, [x[1] for x in L_x], label="L_x1")
+
+axes[2].plot(T, G_x, label="G_x")
+axes[2].plot(T, L_x, label="L_x")
+axes[2].plot(T, x_ref, label="x_ref")
+
+axes[3].plot(T, G_y, label="G_y")
+axes[3].plot(T, L_y, label="L_y")
+
+for ax in axes:
+    ax.grid(True)
+    ax.legend()
+
+plt.show()
 ```
 
-To run this example, run
-
-```
-pip install -r requirements.txt
-python3 sim_test.py
-```
+There are other examples in the ```sim_link/sim_test.py``` file.
 
 
 ## Basic ideas
