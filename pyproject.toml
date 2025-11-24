@@ -1,0 +1,33 @@
+[project]
+name = "sim_link"
+version = "0.1.0"
+description = "A simple simulation package."
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+    {name = "Imran Sajjad", email = "imransajjad89@gmail.com"},
+]
+license = { file = "LICENSE" }
+
+dependencies = [
+    "numpy>=2.2.6",
+    "scipy>=1.13.0",
+    "matplotlib>=3.9.2"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["sim_link"]
+
+# Optional: pytest config to ensure it finds your tests/ folder
+[tool.pytest.ini_options]
+testpaths = ["tests"]

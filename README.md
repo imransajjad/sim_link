@@ -6,12 +6,33 @@ This is my project to replicate some Simulink (R) functionality in python.
 
 sim_link.py is a module that can be imported, it has extensive documentation in its docstring. It provides an interface to write system blocks, and connect them together to build models. These models can further be connected into higher level models and can also be unpacked into the base system blocks.
 
+## Installation
+
+You can use pip with the github repo
+
+```
+pip install https://github.com/imransajjad/sim_link.git@main
+```
+
+or clone the repo and install
+```
+git clone https://github.com/imransajjad/sim_link.git
+pip install sim_link
+```
+and/or pass the ```-e``` flag to install in editable mode
+```
+pip install -e sim_link
+```
+
 ## Basic workflow:
 
 Step 1: Write functions representing models of dynamic systems and then create
 MDL-like objects with the supplied ```MDLBase``` class, for example:
 
 ```python
+import sim_link
+import numpy as np
+
 def L_der(t, x, u, y):
     return np.array([x[1], -1.0 * x[0] - 2.0 * x[1] + u[0, 0]])
 
@@ -19,7 +40,7 @@ def L_out(t, x, u, y):
     L = np.matrix("0.5; 1.5")
     return 1.0 * x + L * y
 
-L = sl.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="Observer L")
+L = sim_link.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="Observer L")
 
 # 2 is number of inputs (u and y)
 # [1] are the indices of inputs that are required to compute output (y)
@@ -58,6 +79,11 @@ If this is taken to be the usual plant, observer controller system,
 the signals on the wires should be evaluated in the order G, L, K, which is accomplished by the following code
 
 ```python
+import sim_link
+import sim_link.sim_lib as sim_lib
+import sim_link.ode_solvers as ode
+import numpy as np
+
 def G_der(t, x, u):
     A = np.matrix("0 1; -1 -2")
     B = np.matrix("0;1")
@@ -84,16 +110,17 @@ def L_out(t, x, u, y):
     L = np.matrix("0.5; 1.5")
     return 1.0 * x + L * y
 
-G = sl.MDLBase(G_der, G_out, 1, [], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
-K = sl.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
-L = sl.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
+G = sim_link.MDLBase(G_der, G_out, 1, [], np.array([1.0, 0.6], ndmin=2).T, name="G_sys")
+K = sim_link.MDLBase(None, K_out, 1, [0], np.array([], ndmin=2).T, name="K_sys")
+L = sim_link.MDLBase(L_der, L_out, 2, [1], np.array([0.0, 0.0], ndmin=2).T, name="L_sys")
 
-M = sl.MDL((G, K, sll.gain(10), sll.sub(), [], L, 1, 0), name="sys_model_1")
-# M = sl.MDL((G, K, sll.gain(10), sll.sub(), [], L, 0, 1), name="sys_model_1") # try this, it'll cause an algebraic loop error
+M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 1, 0), name="sys_model_1")
+# M = sim_link.MDL((G, K, sim_lib.gain(10), sim_lib.sub(), [], L, 0, 1), name="sys_model_1") # try this, it'll cause an algebraic loop error
 
 print(M.table())
 
 # M is now a model like object and M.der can be passed to an ODE solver
+T, X = ode.rungekutta4ad(M.der, T, M.get_x0())
 
 ```
 

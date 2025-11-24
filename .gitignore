@@ -8,6 +8,7 @@
 *.so
 *.pyc
 *.pyo
+*sim_link.egg-info/*
 
 # Packages #
 ############
@@ -38,3 +39,4 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+.vscode

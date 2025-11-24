@@ -35,7 +35,7 @@ from math import sqrt
 
 
 def integrate(f, *args):
-    """simple dirty integration
+    """simple integration
     fixed step:	x = x+f*dt
     it is expected that f(t,x,*args)
     the order of input arguments should be as follows #
@@ -44,6 +44,8 @@ def integrate(f, *args):
     x = args[-1]
     X = [x]
     T = [args[-2][0]]
+
+    dt = args[-2][1] - args[-2][0]
 
     for t in args[-2]:
 
@@ -234,91 +236,3 @@ def rungekutta4ad(f, *args, **kwargs):
         return T, X
     else:
         return T, X, Y
-
-
-def test_f(t, x):
-    dx = np.array([0.0] * 2)
-
-    dx[0] = x[1]
-    dx[1] = -2 * x[0] - 0.5 * x[1]
-
-    return (dx, 0.0)
-
-
-def normpdf(x, mu, sigma):
-    xad = (x - mu) / sigma
-    return np.exp(-(xad**2) / 2) / np.sqrt(2 * np.pi) / sigma
-
-
-def fX(x):
-    mu = 1.0
-    sigma = 0.1
-    return normpdf(x, mu, sigma)
-
-
-def fY(x, X):
-    mu = X
-    sigma = 0.01
-    return normpdf(x, mu, sigma)
-
-
-def test1():
-    T = np.arange(0, 10, 0.05)
-    x0 = np.array([2.0, 0])
-
-    k = 2
-    m = 1
-    b = 0.5
-    wn = np.sqrt(k / m)
-    gamma = b / 2 / np.sqrt(k * m)
-    wd = wn * np.sqrt(1 - gamma**2)
-    sigma = gamma * wn
-    s1 = np.array([-sigma + wd * 1.0j])
-    s2 = np.array([-sigma - wd * 1.0j])
-    print(k, m, b, gamma, wd, sigma, wn)
-
-    x00 = 2
-    v00 = 0
-    alpha = x00 / 2
-    beta = (v00 + sigma * x00) / 2 / wd
-
-    X0 = [1 * np.exp(s1 * t) + 1 * np.exp(s2 * t) for t in T]
-    X0 = [2 * (alpha * np.cos(wd * t) + beta * np.sin(wd * t)) * np.exp(-sigma * t) for t in T]
-    X1 = integrate(test_f, T, x0)
-    X2 = trapz(test_f, T, x0)
-    X3 = rungekutta4(test_f, T, x0)
-
-    plt.plot(T, X0, label="true")
-    plt.plot(T, X1[1][:, 0], label="int")
-    plt.plot(T, X2[1][:, 0], label="trapz")
-    plt.plot(T, X3[1][:, 0], label="rk4")
-    plt.legend()
-    plt.show()
-
-
-def test2():
-    x = np.arange(-50, 50, 0.01)
-
-    e = lambda x, u: np.exp(-((x / u) ** 2)) / u
-    D = lambda x, y, u1, u2: (np.array([np.sqrt(2 / np.pi * u1 * u2) * e(x, u1) * e(x, u2)]), 0.0)
-
-    u1 = 10.0
-    U2 = np.arange(0.1, 2.51, 0.05)
-    Y = 0 * U2
-    for i, u2 in enumerate(U2):
-        print(u2)
-        _, y, _ = rungekutta4(D, u1, u2, x, np.array([0.0]))
-        Y[i] = y[-1][0]
-
-    plt.plot(U2, Y)
-    plt.plot(U2, np.sqrt(2 / (U2 / u1 + u1 / U2)))
-    plt.legend()
-    plt.show()
-
-
-if __name__ == "__main__":
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    print(__doc__)
-    test1()

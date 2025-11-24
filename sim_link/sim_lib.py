@@ -6,7 +6,7 @@ most functions are written and tested to support numpy matrices"""
 import numpy as np
 import scipy
 
-import sim_link as sl
+import sim_link.sim_link as sl
 
 
 # @diagram_block(label="Gain", style="triangle;whiteSpace=wrap;html=1;", geometry=(-60, 150, 60, 80))
@@ -184,7 +184,7 @@ class StateSpaceLTI(sl.MDLBase):
 
     def __init__(self, A, B, C, D=None, x0=None, name="SS_LTI"):
 
-        if not x0:
+        if x0 is None:
             x0 = np.array([[0]] * A.shape[1])
             print("x0 ", x0)
         super().__init__(self.der, self.out, 1, [0] if D else [], x0, name=name)
@@ -245,7 +245,7 @@ class Pow(sl.MDLBase):
         return u**self.power
 
 
-class signal_gen(sl.MDLBase):
+class SignalGen(sl.MDLBase):
     """y = A*cos(wt+phi)+ofs"""
 
     def __init__(self, amplitude, omega, phase=0, offset=0, name="signal_gen"):
@@ -259,7 +259,7 @@ class signal_gen(sl.MDLBase):
         return self.A * np.cos(self.omega * t + self.phase) + self.offset
 
 
-class random_gen(sl.MDLBase):
+class RandomGen(sl.MDLBase):
     """y = A*randn(args)"""
 
     def __init__(self, amplitude, randfn, randargs, name="rand_gen"):
