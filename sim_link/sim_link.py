@@ -188,31 +188,52 @@ class XList(object):
     """
 
     def __init__(self, init_list, index_strs=None):
+        # store internal copy
         self._list = list(init_list)
+
+        # index strings handling
         self._index_strs = index_strs
-        if index_strs:
-            self._index = { str_i:i for i,str_i in enumerate(index_strs)}
+        if index_strs is not None:
+            if len(index_strs) != len(self._list):
+                raise ValueError("index_strs must match length of init_list")
+            self._index = {name: i for i, name in enumerate(index_strs)}
+        else:
+            self._index = None
+
+    def _check_compatible(self, other):
+        if not isinstance(other, XList):
+            raise TypeError("Can only add XList to XList")
+        if len(self._list) != len(other._list):
+            raise ValueError("XList lengths do not match")
 
     def __add__(self, other):
-        """
-        only support adding scalar 0. otherwise only XList can be added to XList
-        """
-        if other == 0:
-            return XList(self._list, self._index_strs)
-        return XList([a + b if not (a is None or b is None) else None for a, b in zip(self._list, other)], index_strs=self._index_strs)
+        # scalar addition
+        if isinstance(other, (int, float)):
+            return XList(
+                [None if a is None else a + other for a in self._list],
+                self._index_strs
+            )
+
+        # XList addition
+        self._check_compatible(other)
+        return XList(
+            [
+                None if (a is None or b is None) else a + b
+                for a, b in zip(self._list, other._list)
+            ],
+            self._index_strs
+        )
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __mul__(self, other):
-        """
-        only support scalar multiplication
-        """
-        assert not isinstance(other, XList)
-        return XList([a * other if not (a is None) else None for a in self._list], index_strs=self._index_strs)
-
-    def __lmul__(self, other):
-        return self.__mul__(other)
+        if not isinstance(other, (int, float)):
+            raise TypeError("Only scalar multiplication is supported")
+        return XList(
+            [None if a is None else a * other for a in self._list],
+            self._index_strs
+        )
 
     def __rmul__(self, other):
         return self.__mul__(other)
@@ -225,17 +246,22 @@ class XList(object):
         return XList([a / other if not (a is None) else None for a in self._list], index_strs=self._index_strs)
 
     def __getitem__(self, index):
-        if type(index) == str:
+        if isinstance(index, str):
+            if self._index is None:
+                raise KeyError("String indexing not enabled")
             index = self._index[index]
-        return self._list.__getitem__(index)
+        return self._list[index]
 
     def __setitem__(self, key, value):
-        if type(key) == str:
+        if isinstance(key, str):
+            if self._index is None:
+                raise KeyError("String indexing not enabled")
             key = self._index[key]
-        return self._list.__setitem__(key, value)
+        self._list[key] = value
 
     def __repr__(self):
-        return f"XList: keys: {self._index_strs.__repr__()} values: {self._list.__repr__()}"
+        return f"XList(keys={self._index_strs}, values={self._list})"
+
 
 
 class SignalType(object):
