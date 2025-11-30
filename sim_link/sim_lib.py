@@ -82,7 +82,7 @@ def inv(name="inv"):
     """inverse a signal out=1/u"""
 
     def out(t, x, u):
-        return 1.0 / b
+        return 1.0 / u
 
     return sl.MDLBase(None, out, 1, [0], None, name=name)
 

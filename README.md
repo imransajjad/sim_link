@@ -128,7 +128,7 @@ print(M.table())
 # M is now a model like object and M.der can be passed to an ODE solver
 x_ref = np.array([-1.045, 0.0], ndmin=2).T
 T = np.arange(0, 10.0, 0.01)
-T, X = ode.rungekutta4ad(M.der, x_ref, T, M.get_x0())
+T, X = ode.rungekutta4ad(M.der, T, M.get_x0(), x_ref)
 Y = [M.out(t, x, x_ref, probes=True) for t, x in zip(T, X)]
 
 print("T[-1] =", T[-1])

@@ -7,72 +7,80 @@ matplotlib.use("Agg")  # comment this and uncomment plt.show to view test plots
 import matplotlib.pyplot as plt
 
 
-def normpdf(x, mu, sigma):
-    xad = (x - mu) / sigma
-    return np.exp(-(xad**2) / 2) / np.sqrt(2 * np.pi) / sigma
-
-
-def fX(x):
-    mu = 1.0
-    sigma = 0.1
-    return normpdf(x, mu, sigma)
-
-
-def fY(x, X):
-    mu = X
-    sigma = 0.01
-    return normpdf(x, mu, sigma)
-
-
 def test1():
     """
-    simulate the system given by m*x''(t) + b*x'(t) + k*x(t) = 0
-    with initial x(0) = 2.0, x'(0) = 0.0, compare analytical solution with
-    solvers output
+    since the solver expects a
+    dx/dt = f(t,x,...) type function,
+    define a bunch of the and test
     """
-    T = np.arange(0, 10, 0.05)
-    x0 = np.array([2.0, 0])
 
-    def test_f(t, x):
+    def test_x(t, k, m, b, x0):
+        x = np.array([0.0] * 2)
+        wn = np.sqrt(k / m)
+        gamma = b / 2 / np.sqrt(k * m)
+        wd = wn * np.sqrt(1 - gamma**2)
+        sigma = gamma * wn
+        # s1 = np.array([-sigma + wd * 1.0j])
+        # s2 = np.array([-sigma - wd * 1.0j])
+        x00 = x0[0]
+        v00 = x0[1]
+        alpha = x00 / 2
+        beta = (v00 + sigma * x00) / 2 / wd
+        x[0] = 2 * (alpha * np.cos(wd * t) + beta * np.sin(wd * t)) * np.exp(-sigma * t)
+        x[1] = 2 * (-alpha * wd*np.sin(wd * t) + beta *wd*np.cos(wd * t)) * np.exp(-sigma * t) + \
+            2 * (alpha * np.cos(wd * t) + beta * np.sin(wd * t)) * np.exp(-sigma * t)*(-sigma)
+        return x
+        
+
+    def test_f(t, x, k, m, b):
         dx = np.array([0.0] * 2)
-
         dx[0] = x[1]
-        dx[1] = -2 * x[0] - 0.5 * x[1]
-
+        dx[1] = -k/m * x[0] - b/m * x[1]
         return dx
+    
+    def get_test_x(k,m,b,x0):
+        return lambda t : test_x(t,k,m,b,x0)
 
-    k = 2
-    m = 1
-    b = 0.5
-    wn = np.sqrt(k / m)
-    gamma = b / 2 / np.sqrt(k * m)
-    wd = wn * np.sqrt(1 - gamma**2)
-    sigma = gamma * wn
-    s1 = np.array([-sigma + wd * 1.0j])
-    s2 = np.array([-sigma - wd * 1.0j])
-    # print(k, m, b, gamma, wd, sigma, wn)
+    def get_test_f(k,m,b):
+        return lambda t,x : test_f(t,x,k,m,b)
 
-    x00 = x0[0]
-    v00 = x0[1]
-    alpha = x00 / 2
-    beta = (v00 + sigma * x00) / 2 / wd
+    test_funcs = [
+        (get_test_x(2,1,0.5,np.array([2.0,0])), get_test_f(2,1,0.5), np.arange(0, 10, 0.05), "1/(s^2 + 0.5s + 2)"),
+        (get_test_x(4,1,0.0,np.array([5.0,0])), get_test_f(4,1,0.0), np.arange(0, 10, 0.05), "1/(s^2 + 4)"),
+        (get_test_x(8,1,-0.2,np.array([0.1,0])), get_test_f(8,1,-0.2), np.arange(0, 10, 0.05), "1/(s^2 -0.2s + 8)"),
+    ] # list of x(t), dx/dt, trange, label tuples
 
-    X0 = [1 * np.exp(s1 * t) + 1 * np.exp(s2 * t) for t in T]
-    X0 = [2 * (alpha * np.cos(wd * t) + beta * np.sin(wd * t)) * np.exp(-sigma * t) for t in T]
-    T1, X1 = integrate(test_f, T, x0)
-    T2, X2 = trapz(test_f, T, x0)
-    T3, X3 = rungekutta4(test_f, T, x0)
 
-    plt.plot(T, X0, label="true")
-    plt.plot(T1, [x[0] for x in X1], label="int")
-    plt.plot(T2, [x[0] for x in X2], label="trapz")
-    plt.plot(T3, [x[0] for x in X3], label="rk4")
-    plt.legend()
+    test_solvers = [
+        (integrate, "integrate"),
+        (trapz, "trapz"),
+        (rungekutta4, "rk4"),
+        (rungekutta4ad, "rk4ad"),
+    ]
+
+    fig, axes = plt.subplots(len(test_funcs),2, figsize=(10, 3*len(test_funcs)))
+    for row, (x_actual, dx, trange, flabel) in enumerate(test_funcs):
+        x0 = x_actual(trange[0])
+        T0, X0 = trange, [x_actual(t) for t in trange]
+
+        for solver, label in test_solvers:
+            T1, X1 = solver(dx, trange, x0)
+            axes[row,0].plot(T1, X1, label=label)
+            err = [x_actual(t1)-x1 for t1,x1 in zip(T1,X1)]
+            axes[row,1].plot(T1, err, label=label+f" {np.linalg.norm(err):.2e}")
+        axes[row,0].plot(T0, X0, label="true")
+        axes[row,0].legend()
+        axes[row,1].legend()
+        axes[row,0].set_title(flabel)
+        axes[row,1].set_title(flabel + " error")
+    
+    fig.suptitle("ode_test_test1")
+    fig.tight_layout()
     plt.savefig("ode_test_test1.png")
     # plt.show()
 
 
-def test2():
+def _test2():
     x = np.arange(-50, 50, 0.01)
 
     e = lambda x, u: np.exp(-((x / u) ** 2)) / u
@@ -83,7 +91,7 @@ def test2():
     Y = 0 * U2
     for i, u2 in enumerate(U2):
         # print(u2)
-        _, y = rungekutta4(Df, u1, u2, x, 0.0)
+        _, y = rungekutta4(Df, x, 0.0, u1, u2)
         Y[i] = y[-1]
 
     plt.plot(U2, np.sqrt(2 / (U2 / u1 + u1 / U2)), label="true")
@@ -93,6 +101,54 @@ def test2():
     # plt.show()
 
 
+def test3():
+    """
+    since the solver expects a
+    dx/dt = f(t,x,...) type function or equivalently a
+    dy/dx = f(x,y,...) type function,
+    ignore the second arg for integrating over domain only i.e.
+    dy/dx = cos(x) for y = sin(x)
+    """
+
+    test_funcs = [
+        (np.sin, lambda x, _ : np.cos(x), np.arange(-10,10, 0.01), "sin"),
+        (np.exp, lambda x, _ : np.exp(x), np.arange(-10,10, 0.01), "exp"),
+        (lambda x: 1/(1-np.pow(x,2)), lambda x, _ : 2*x/(1-np.pow(x,2))**2, np.arange(-10,-1.02, 0.02), "1/(1-x^2) region 1"),
+        (lambda x: 1/(1-np.pow(x,2)), lambda x, _ : 2*x/(1-np.pow(x,2))**2, np.arange(-0.98,0.98, 0.02), "1/(1-x^2) region 2"),
+        (lambda x: 1/(1-np.pow(x,2)), lambda x, _ : 2*x/(1-np.pow(x,2))**2, np.arange(1.02, 10, 0.02), "1/(1-x^2) region 3"),
+    ] # list of y(x), dy/dx, xrange, label tuples
+
+
+    test_solvers = [
+        (integrate, "integrate"),
+        (trapz, "trapz"),
+        (rungekutta4, "rk4"),
+        (rungekutta4ad, "rk4ad"),
+    ]
+
+    fig, axes = plt.subplots(len(test_funcs),2, figsize=(10, 3*len(test_funcs)))
+    for row, (y_actual, dy, x, flabel) in enumerate(test_funcs):
+        y0 = y_actual(x[0])
+        X0, Y0 = x, y_actual(x)
+
+        for solver, label in test_solvers:
+            X1, Y1 = solver(dy, x, y0)
+            axes[row,0].plot(X1, Y1, label=label)
+            err = [y0-y1 for y0,y1 in zip(y_actual(X1),Y1)]
+            axes[row,1].plot(X1, err, label=label+f"{np.linalg.norm(err):.2e}")
+        axes[row,0].plot(X0, Y0, label="true")
+        axes[row,0].legend()
+        axes[row,1].legend()
+        axes[row,0].set_title(flabel)
+        axes[row,1].set_title(flabel + " error")
+
+    
+    fig.suptitle("ode_test_test3")
+    fig.tight_layout()
+    plt.savefig("ode_test_test3.png")
+    # plt.show()
+
 if __name__ == "__main__":
     test1()
-    test2()
+    # _test2()
+    test3()

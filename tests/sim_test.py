@@ -189,7 +189,7 @@ def __test1():
 
     x0 = np.transpose(np.matrix(x0))
     # Tad,Xad = ode.rungekutta4ad(M.der, x_ref, Trange, x0, e_tol=1e-5, min_dt=1e-4 )
-    T, X = ode.rungekutta4(M.der, x_ref, Trange, x0)
+    T, X = ode.rungekutta4(M.der, Trange, x0, x_ref)
     Y = [M.out(t, x, x_ref) for t, x in zip(T, X)]
 
     print(T[-1], len(T))
@@ -292,7 +292,7 @@ def __test4():
 
     # M.out(0.0,x0,d_in)
     x0 = np.transpose(np.matrix(M.x0))
-    T, X = ode.rungekutta4ad(M.der, d_in, T, x0)
+    T, X = ode.rungekutta4ad(M.der, T, x0, d_in)
     Y = [M.out(t, x, d_in) for t, x in zip(T, X)]
 
     print(T[-1])
@@ -352,7 +352,7 @@ def __test8():
     x0 = M.get_x0()
     print(x0)
 
-    T, X = ode.rungekutta4ad(M.der, x_ref, T, x0)
+    T, X = ode.rungekutta4ad(M.der, T, x0, x_ref)
     Y = [M.out(t, x, x_ref).probe_s([0], [1]) for t, x in zip(T, X)]
 
     print(T[-1])
@@ -398,7 +398,7 @@ def __test7():
     # dx0 = M.der(T[0], x0, x_in)
     # print(dx0)
 
-    T, X, Y = ode.rungekutta4ad(M.der, x_in, T, x0, outcall=M.all_out, adaptive=False, realtime=False, plotcalls=[PW.animate], plottime=0.01)
+    T, X, Y = ode.rungekutta4ad(M.der, T, x0, x_in, outcall=M.all_out, adaptive=False, realtime=False, plotcalls=[PW.animate], plottime=0.01)
 
     PW.show()
 
@@ -446,7 +446,7 @@ def test_GLK():
     x0 = M.get_x0()
     print("x0 =", x0)
 
-    T, X = ode.rungekutta4ad(M.der, x_ref, T, x0)
+    T, X = ode.rungekutta4ad(M.der, T, x0, x_ref)
     Y = [M.out(t, x, x_ref, probes=True) for t, x in zip(T, X)]
 
     print("T[-1] =", T[-1])
@@ -460,7 +460,7 @@ def test_GLK():
     G_y = [np.array(y["G_sys"])[:, 0] for y in Y]
     L_y = [np.array(y["L_sys"])[:, 0] for y in Y]
 
-    fig, axes = plt.subplots(4, 1)
+    fig, axes = plt.subplots(4, 1, figsize=(10, 6))
     axes[0].plot(T, [x[0] for x in G_x], label="G_x0")
     axes[0].plot(T, [x[0] for x in L_x], label="L_x0")
 
@@ -477,6 +477,11 @@ def test_GLK():
     for ax in axes:
         ax.grid(True)
         ax.legend()
+
+    fig.suptitle("sim_test_test_GLK")
+    fig.tight_layout()
+    plt.savefig("sim_test_test_GLK.png")
+    # plt.show()
 
 
 def test_filter():
@@ -495,12 +500,20 @@ def test_filter():
     T, X = ode.rungekutta4ad(M.der, T, x0)
     Y = [M.out(t, x, probes=True) for t, x in zip(T, X)]
 
-    fig, axes = plt.subplots(2, 1)
+    fig, axis = plt.subplots(1, 1, figsize=(10, 3))
     signal = [np.array(y["signal"]) for y in Y]
     filtered = [np.array(y["filtered"])[:, 0] for y in Y]
-    axes[0].plot(T, signal, label="signal")
-    axes[0].plot(T, filtered, label="filtered")
+    axis.plot(T, signal, label="signal")
+    axis.plot(T, filtered, label="filtered")
 
-    for ax in axes:
-        ax.grid(True)
-        ax.legend()
+    axis.grid(True)
+    
+    fig.suptitle("sim_test_test_filter")
+    fig.tight_layout()
+    plt.savefig("sim_test_test_filter.png")
+    # plt.show()
+
+
+if __name__ == "__main__":
+    test_GLK()
+    test_filter()

@@ -34,43 +34,44 @@ import time
 from math import sqrt
 
 
-def integrate(f, *args):
-    """simple integration
+def integrate(f, trange, x, *args):
+    """
+    simple integration
     fixed step:	x = x+f*dt
     it is expected that f(t,x,*args)
     the order of input arguments should be as follows #
-    function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
+    function, Trange, init X, arg1 to f, arg2 to f, ..., argn to f
+    """
 
-    x = args[-1]
     X = [x]
-    T = [args[-2][0]]
+    T = [trange[0]]
+    dt = trange[1] - trange[0]
 
-    dt = args[-2][1] - args[-2][0]
+    for t in trange:
 
-    for t in args[-2]:
-
-        k = f(t, x, *args[0:-2])
+        k = f(t, x, *args)
         x = x + k * dt
         X.append(x)
         T.append(t)
     return T, X
 
 
-def trapz(f, *args):
-    """trapezoidal integration
+def trapz(f, trange, x, *args):
+    """
+    trapezoidal integration
     fixed step:	x = x+0.5*(f(x)+f(x+f(x)*dt))*dt
     it is expected that f(t,x,*args)
     the order of input arguments should be as follows #
-    function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
+    function, Trange, init X, arg1 to f, arg2 to f, ..., argn to f
+    """
 
-    x = args[-1]
     X = [x]
-    T = [args[-2][0]]
+    T = [trange[0]]
+    dt = trange[1] - trange[0]
 
-    dt = args[-2][1] - args[-2][0]
-    for t in args[-2]:
-        k1 = f(t, x, *args[0:-2])
-        k2 = f(t + dt, x + k1 * dt, *args[0:-2])
+    for t in trange:
+        k1 = f(t, x, *args)
+        k2 = f(t + dt, x + k1 * dt, *args)
         x = x + 0.5 * (k1 + k2) * dt
 
         X.append(x)
@@ -78,24 +79,25 @@ def trapz(f, *args):
     return T, X
 
 
-def rungekutta4(f, *args):
-    """trapezoidal integration
+def rungekutta4(f, trange, x, *args):
+    """
+    trapezoidal integration
     fixed step:	four terms of rungekutta4
     it is expected that f(t,x,*args)
     the order of input arguments should be as follows #
-    function, arg1 to f, arg2 to f, ..., argn to f, Trange, init X"""
+    function, Trange, init X, arg1 to f, arg2 to f, ..., argn to f
+    """
 
-    x = args[-1]
     X = [x]
-    T = [args[-2][0]]
+    T = [trange[0]]
+    dt = trange[1] - trange[0]
 
-    dt = args[-2][1] - args[-2][0]
-    for t in args[-2]:
+    for t in trange:
 
-        k1 = f(t, x, *args[0:-2])
-        k2 = f(t + dt / 2, x + k1 * dt / 2, *args[0:-2])
-        k3 = f(t + dt / 2, x + k2 * dt / 2, *args[0:-2])
-        k4 = f(t + dt, x + k3 * dt, *args[0:-2])
+        k1 = f(t, x, *args)
+        k2 = f(t + dt / 2, x + k1 * dt / 2, *args)
+        k3 = f(t + dt / 2, x + k2 * dt / 2, *args)
+        k4 = f(t + dt, x + k3 * dt, *args)
 
         x = x + (k1 + 2 * k2 + 2 * k3 + k4) / 6 * dt
         X.append(x)
@@ -103,15 +105,13 @@ def rungekutta4(f, *args):
     return T, X
 
 
-def rungekutta4ad(f, *args, **kwargs):
+def rungekutta4ad(f, trange, x, *args, **kwargs):
 
-    t = args[-2][0]
-    dt = args[-2][1] - args[-2][0]
-    Tf = args[-2][-1]
-    x = args[-1]
-
-    T = [t]
     X = [x]
+    t = trange[0]
+    T = [trange[0]]
+    Tf = trange[-1]
+    dt = trange[1] - trange[0]
 
     P = {
         "min_dt": 1e-5,
@@ -156,12 +156,12 @@ def rungekutta4ad(f, *args, **kwargs):
         sys_time = time.time()
         plot_time = time.time()
         ti = 1
-        len_T = len(args[-2])
-        Ttarget = args[-2][ti]
+        len_T = len(trange)
+        Ttarget = trange[ti]
 
     Y = []
     if P["outcall"]:
-        Y.append(P["outcall"](t, x, *args[0:-2]))
+        Y.append(P["outcall"](t, x, *args))
 
     print("ode_solver with config")
     for p in P.keys():
@@ -171,7 +171,7 @@ def rungekutta4ad(f, *args, **kwargs):
     while t < Ttarget:
 
         for i, (c, a_row) in enumerate(zip(C, A)):
-            k[i] = f(t + c * dt, x + dt * sum([k[j] * a for j, a in enumerate(a_row)]), *args[0:-2])
+            k[i] = f(t + c * dt, x + dt * sum([k[j] * a for j, a in enumerate(a_row)]), *args)
 
         gradup = sum([k[i] * b for i, b in enumerate(Bup)])
 
@@ -191,7 +191,7 @@ def rungekutta4ad(f, *args, **kwargs):
                 X.append(x)
                 dt = (1.0 + P["gain"]) * dt
                 if P["outcall"]:
-                    Y.append(P["outcall"](t, x, *args[0:-2]))
+                    Y.append(P["outcall"](t, x, *args))
             else:
                 # retry
                 dt = (1.0 - P["gain"]) * dt
@@ -202,16 +202,16 @@ def rungekutta4ad(f, *args, **kwargs):
             T.append(t)
             X.append(x)
             if P["outcall"]:
-                Y.append(P["outcall"](t, x, *args[0:-2]))
+                Y.append(P["outcall"](t, x, *args))
 
         if P["realtime"]:
             ti += 1
             if ti < len_T:
-                Ttarget = args[-2][ti]
+                Ttarget = trange[ti]
                 cur_time = time.time()
                 # print "here plotting"
-                # print (args[-2][ti]-args[-2][ti-1]) - (time.time()-sys_time) > 0.001
-                if (args[-2][ti] - args[-2][ti - 1]) - (time.time() - sys_time) > P["plottime"]:
+                # print (trange[ti]-trange[ti-1]) - (time.time()-sys_time) > 0.001
+                if (trange[ti] - trange[ti - 1]) - (time.time() - sys_time) > P["plottime"]:
                     plot_time = time.time()
                     if P["plotcalls"]:
                         # print "here2"
@@ -220,8 +220,8 @@ def rungekutta4ad(f, *args, **kwargs):
                     # print time.time()-plot_time
 
                     # cur_time = time.time()
-                # print time.time()-sys_time , (args[-2][ti]-args[-2][ti-1])
-                while (time.time() - sys_time) < (args[-2][ti] - args[-2][ti - 1]):
+                # print time.time()-sys_time , (trange[ti]-trange[ti-1])
+                while (time.time() - sys_time) < (trange[ti] - trange[ti - 1]):
                     # print "waiting"
                     pass
 
